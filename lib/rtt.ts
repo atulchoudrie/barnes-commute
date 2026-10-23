@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { BARNES, CROSSING, WATERLOO, applyLive, buildBoard, crossingTimes, parseDepartures, parseReturns, type Board, type CommuteConfig, type CrossingFeed, type LiveBarrier, type RttService } from "./commute";
 
 // Realtime Trains API (https://data.rtt.io). Token from https://api-portal.rtt.io: RTT_TOKEN.
@@ -34,11 +35,10 @@ async function exchangeRefreshToken(): Promise<boolean> {
   return true;
 }
 
-async function location(params: Record<string, string>, revalidate: number): Promise<RttService[]> {
-  const url = `${API}/gb-nr/location?${new URLSearchParams({ timeWindow: "120", ...params })}`;
+async function fetchLocation(url: string): Promise<RttService[]> {
   const get = async () => fetch(url, {
     headers: { authorization: `Bearer ${await accessToken()}`, accept: "application/json", version: API_VERSION },
-    next: { revalidate },
+    cache: "no-store",
     signal: AbortSignal.timeout(8000),
   });
   let res = await get();
@@ -49,6 +49,26 @@ async function location(params: Record<string, string>, revalidate: number): Pro
   if (!res.ok) throw new Error(`Realtime Trains returned ${res.status}`);
   const j = await res.json();
   return Array.isArray(j.services) ? j.services : [];
+}
+
+// Last good answer per lookup, for when Realtime Trains refuses (e.g. the free plan's request limit).
+const lastGood = new Map<string, RttService[]>();
+
+/**
+ * A location line-up, from Vercel's shared cache for `revalidate` seconds. Only good answers are cached (a thrown
+ * error never is), and if a fresh lookup fails the last good one is used instead.
+ */
+async function location(params: Record<string, string>, revalidate: number): Promise<RttService[]> {
+  const url = `${API}/gb-nr/location?${new URLSearchParams({ timeWindow: "120", ...params })}`;
+  try {
+    const services = await unstable_cache(() => fetchLocation(url), ["rtt-location", url], { revalidate })();
+    lastGood.set(url, services);
+    return services;
+  } catch (e) {
+    const stale = lastGood.get(url);
+    if (stale) return stale;
+    throw e;
+  }
 }
 
 // Trains over White Hart Lane crossing, from Mortlake times: towards Richmond ("down") they cross about a minute
