@@ -1,0 +1,22 @@
+# Render Blueprint for the live White Hart Lane barrier worker (worker/barrier) on Render's free plan.
+# Render → New → Blueprint → this repo. Free services sleep after 15 min without requests, so point a free pinger
+# (e.g. cron-job.org, every 10 min) at /health – see worker/barrier/README.md.
+services:
+  - type: web
+    name: barnes-barrier
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./worker/barrier/Dockerfile
+    dockerContext: ./worker/barrier
+    healthCheckPath: /health
+    buildFilter:
+      paths:
+        - worker/barrier/**
+    envVars:
+      - key: NR_USERNAME
+        sync: false
+      - key: NR_PASSWORD
+        sync: false
+      - key: WORKER_KEY
+        sync: false
