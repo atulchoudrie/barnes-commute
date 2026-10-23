@@ -282,13 +282,26 @@ export interface ReturnTrain extends Departure {
   homeAt: number | null;
 }
 
-/** Barnes-bound trains from Waterloo (departure board), joined to their arrival at Barnes (arrivals from Waterloo). */
+/**
+ * Barnes-bound trains from Waterloo (departure board), joined to their arrival at Barnes (arrivals from Waterloo).
+ * Hounslow loop trains call at Barnes twice – on the way out and again on the way back to Waterloo – so the first call is used.
+ */
 export function parseReturns(fromWaterloo: RttService[], atBarnes: RttService[], cfg: Pick<CommuteConfig, "walkMinutes">, now: number): ReturnTrain[] {
-  const arrivals = new Map(atBarnes.map((s) => [s.scheduleMetadata.uniqueIdentity, s.temporalData.arrival]));
+  const arrivals = new Map<string, RttTimes | undefined>();
+  for (const s of atBarnes) {
+    const uid = s.scheduleMetadata.uniqueIdentity, a = s.temporalData.arrival, seen = arrivals.get(uid);
+    if (!arrivals.has(uid) || (booked(a) ?? Infinity) < (booked(seen) ?? Infinity)) arrivals.set(uid, a);
+  }
   return parseDepartures(fromWaterloo, now).map((d) => {
     const a = arrivals.get(d.uid);
     const arriveScheduled = booked(a), arriveExpected = best(a);
-    return { ...d, arriveScheduled, arriveExpected, homeAt: arriveExpected == null ? null : arriveExpected + cfg.walkMinutes * MIN };
+    return {
+      ...d,
+      destination: d.destination === WATERLOO.name ? "Hounslow loop" : d.destination, // goes round and back to Waterloo
+      arriveScheduled,
+      arriveExpected,
+      homeAt: arriveExpected == null ? null : arriveExpected + cfg.walkMinutes * MIN,
+    };
   });
 }
 

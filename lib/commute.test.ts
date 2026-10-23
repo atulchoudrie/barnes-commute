@@ -163,3 +163,12 @@ test("trains back from Waterloo get their Barnes arrival and a home-by time", ()
   assert.equal(r2.arriveExpected, null); // not in the arrivals list yet
   assert.equal(r2.homeAt, null);
 });
+
+test("Hounslow loop trains use their first call at Barnes, not the one on the way back round", () => {
+  const now = at("1120");
+  const loop = svc("L", { dep: { s: "1127" } });
+  loop.destination = [{ location: { description: "London Waterloo" } }];
+  const [r] = parseReturns([loop], [svc("L", { arr: { s: "1226" } }), svc("L", { arr: { s: "1144" } })], { walkMinutes: 12 }, now);
+  assert.equal(r.arriveExpected, at("1144"));
+  assert.equal(r.destination, "Hounslow loop");
+});

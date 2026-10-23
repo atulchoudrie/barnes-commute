@@ -67,13 +67,18 @@ async function loadLive(): Promise<LiveBarrier | null> {
   const url = process.env.BARRIER_LIVE_URL;
   if (!url) return null;
   try {
+    // Render's free plan can be slow to answer; the forecast is shown if it takes too long.
     const res = await fetch(`${url.replace(/\/$/, "")}/status`, {
       headers: { "x-worker-key": process.env.BARRIER_LIVE_KEY ?? "" },
       cache: "no-store",
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(6000),
     });
-    return res.ok ? await res.json() : null;
-  } catch {
+    if (!res.ok) { console.error(`barrier worker: HTTP ${res.status}`); return null; }
+    const live = await res.json();
+    if (live.feed?.state !== "connected" || !live.area) console.error("barrier worker not ready:", JSON.stringify({ feed: live.feed, area: live.area, lastMessageAt: live.lastMessageAt }));
+    return live;
+  } catch (e) {
+    console.error("barrier worker unreachable:", (e as Error).message);
     return null;
   }
 }
