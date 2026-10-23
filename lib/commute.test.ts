@@ -11,7 +11,16 @@ const cfg: CommuteConfig = {
   barrierCloseBeforeMinutes: 3, barrierOpenAfterMinutes: 1, walkToCrossingMinutes: null,
 };
 
-const svc = (uid: string, l: RttService["locationDetail"], runDate = DAY): RttService => ({ serviceUid: uid, runDate, locationDetail: { isPublicCall: true, displayAs: "CALL", ...l } });
+// A data.rtt.io location line-up service; times given as UK "HHMM" on DAY ("HHMMH" = half past the minute).
+const iso = (hhmm: string) => new Date(at(hhmm)).toISOString();
+type Times = { s?: string; f?: string; a?: string; cancelled?: boolean };
+const times = (t?: Times) => t && { scheduleAdvertised: t.s && iso(t.s), realtimeForecast: t.f && iso(t.f), realtimeActual: t.a && iso(t.a), isCancelled: t.cancelled };
+const svc = (uid: string, o: { dep?: Times; arr?: Times; pass?: Times; displayAs?: string; platform?: string; mode?: string }): RttService => ({
+  temporalData: { departure: times(o.dep), arrival: times(o.arr), pass: times(o.pass), displayAs: o.displayAs ?? "CALL" },
+  locationMetadata: { platform: { planned: o.platform } },
+  destination: [{ location: { description: "London Waterloo" } }],
+  scheduleMetadata: { uniqueIdentity: uid, modeType: o.mode ?? "TRAIN" },
+});
 
 test("UK local times convert across British Summer Time", () => {
   assert.equal(new Date(at("0812")).toISOString(), "2026-10-23T07:12:00.000Z");
@@ -32,21 +41,15 @@ test("walk time from a home location, or as set", () => {
 test("departures use expected times, skip departed trains and keep cancellations", () => {
   const now = at("0800");
   const d = parseDepartures([
-    svc("B", { gbttBookedDeparture: "0812", realtimeDeparture: "0815", platform: "2", destination: [{ description: "London Waterloo" }] }),
-    svc("A", { gbttBookedDeparture: "0805", realtimeDeparture: "0805" }),
-    svc("gone", { gbttBookedDeparture: "0758", realtimeDeparture: "0759", realtimeDepartureActual: true }),
-    svc("X", { gbttBookedDeparture: "0820", displayAs: "CANCELLED_CALL", cancelReasonShortText: "a fault" }),
+    svc("B", { dep: { s: "0812", f: "0815" }, platform: "2" }),
+    svc("A", { dep: { s: "0805", f: "0805" } }),
+    svc("gone", { dep: { s: "0758", a: "0759" } }),
+    svc("X", { dep: { s: "0820", cancelled: true }, displayAs: "CANCELLED" }),
   ], now);
   assert.deepEqual(d.map((x) => x.uid), ["A", "B", "X"]);
   assert.equal(d[1].delayMinutes, 3);
   assert.equal(d[1].platform, "2");
   assert.equal(d[2].cancelled, true);
-});
-
-test("trains after midnight on the same run date roll into the next day", () => {
-  const now = at("2350");
-  const [d] = parseDepartures([svc("late", { gbttBookedDeparture: "0005", gbttBookedDepartureNextDay: true })], now);
-  assert.equal(d.scheduled - now, 15 * MIN);
 });
 
 test("leave time = departure − platform buffer − walk − getting out", () => {
@@ -70,16 +73,16 @@ test("a barrier closure on the walk makes you leave earlier", () => {
 });
 
 test("crossing times: before arriving at Mortlake, after leaving it, passes and estimates", () => {
-  const now = at("0800");
-  const down = crossingTimes([svc("D", { gbttBookedArrival: "0810", realtimeArrival: "0811" })], { kind: "arrives", minutes: 1, group: "down" }, now);
+  const down = crossingTimes([svc("D", { arr: { s: "0810", f: "0811" } })], { kind: "arrives", minutes: 1, group: "down" });
   assert.deepEqual(down[0], { id: "D:down", time: at("0810"), estimated: false });
-  const up = crossingTimes([svc("U", { gbttBookedDeparture: "0820", realtimeDeparture: "0820" })], { kind: "departs", minutes: 1, group: "up" }, now);
+  const up = crossingTimes([svc("U", { dep: { s: "0820", f: "0820" } })], { kind: "departs", minutes: 1, group: "up" });
   assert.equal(up[0].time, at("0821"));
-  const pass = crossingTimes([svc("P", { displayAs: "PASS", realtimePass: "0825H" })], { kind: "arrives", minutes: 1, group: "down" }, now);
+  const pass = crossingTimes([svc("P", { displayAs: "PASS", pass: { s: "0825", f: "0825H" } })], { kind: "arrives", minutes: 1, group: "down" });
   assert.equal(pass[0].time, at("0824") + 30_000);
-  const est = crossingTimes([svc("F", { gbttBookedDeparture: "0830" })], { kind: "departs", minutes: 6, group: "down", estimated: true }, now);
+  const est = crossingTimes([svc("F", { dep: { s: "0830" } })], { kind: "departs", minutes: 6, group: "down", estimated: true });
   assert.deepEqual(est[0], { id: "F:down", time: at("0836"), estimated: true });
-  assert.equal(crossingTimes([svc("C", { gbttBookedArrival: "0830", displayAs: "CANCELLED_CALL" })], { kind: "arrives", minutes: 1, group: "down" }, now).length, 0);
+  assert.equal(crossingTimes([svc("C", { arr: { s: "0830" }, displayAs: "CANCELLED" })], { kind: "arrives", minutes: 1, group: "down" }).length, 0);
+  assert.equal(crossingTimes([svc("Bus", { arr: { s: "0830" }, mode: "BUS" })], { kind: "arrives", minutes: 1, group: "down" }).length, 0);
 });
 
 test("barrier windows merge back-to-back trains and prefer real times over estimates", () => {
@@ -103,8 +106,8 @@ test("barrier windows merge back-to-back trains and prefer real times over estim
 test("board picks the first train you can still make", () => {
   const now = at("0800");
   const deps = parseDepartures([
-    svc("soon", { gbttBookedDeparture: "0806" }), // would need to leave 07:55
-    svc("next", { gbttBookedDeparture: "0816", realtimeDeparture: "0818" }),
+    svc("soon", { dep: { s: "0806" } }), // would need to leave 07:55
+    svc("next", { dep: { s: "0816", f: "0818" } }),
   ], now);
   const b = buildBoard(deps, [], cfg, now);
   assert.equal(b.trains[0].catchable, false);
@@ -115,7 +118,7 @@ test("board picks the first train you can still make", () => {
 
 test("live barrier state overrides the forecast while the feed is fresh", () => {
   const now = at("0800");
-  const deps = parseDepartures([svc("next", { gbttBookedDeparture: "0830" })], now);
+  const deps = parseDepartures([svc("next", { dep: { s: "0830" } })], now);
   const forecast = buildBoard(deps, [{ id: "A:d", time: at("0803"), estimated: false }, { id: "B:d", time: at("0820"), estimated: false }], cfg, now).barrier;
   assert.equal(forecast.source, "timetable");
   assert.equal(forecast.down, true); // 08:00–08:04 forecast

@@ -89,37 +89,41 @@ export function formatClock(t: number): string {
 
 // ---------- Realtime Trains records ----------
 
-/** The parts of a Realtime Trains location-search service we use. */
+/** One activity's times (arrival, departure or pass), from the Realtime Trains API (data.rtt.io). ISO 8601 strings. */
+export interface RttTimes {
+  scheduleAdvertised?: string;
+  scheduleInternal?: string;
+  realtimeForecast?: string;
+  realtimeEstimate?: string;
+  realtimeActual?: string;
+  isCancelled?: boolean;
+  cancellationReasonCode?: string;
+}
+
+/** The parts of a Realtime Trains location line-up service (GET /gb-nr/location) we use. */
 export interface RttService {
-  serviceUid: string;
-  runDate: string;
-  trainIdentity?: string;
-  serviceType?: string;
-  locationDetail: {
-    displayAs?: string;
-    isPublicCall?: boolean;
-    gbttBookedArrival?: string; gbttBookedArrivalNextDay?: boolean;
-    gbttBookedDeparture?: string; gbttBookedDepartureNextDay?: boolean;
-    realtimeArrival?: string; realtimeArrivalNextDay?: boolean; realtimeArrivalActual?: boolean;
-    realtimeDeparture?: string; realtimeDepartureNextDay?: boolean; realtimeDepartureActual?: boolean;
-    realtimePass?: string; realtimePassNextDay?: boolean;
-    wttBookedPass?: string; wttBookedPassNextDay?: boolean;
-    wttBookedArrival?: string; wttBookedDeparture?: string;
-    platform?: string; platformConfirmed?: boolean;
-    cancelReasonShortText?: string;
-    destination?: { description: string }[];
-    origin?: { description: string }[];
+  temporalData: {
+    arrival?: RttTimes;
+    departure?: RttTimes;
+    pass?: RttTimes;
+    displayAs?: string | null; // CALL, CANCELLED, DIVERTED, STARTS, TERMINATES, PASS
+    scheduledCallType?: string | null;
   };
+  locationMetadata?: { platform?: { planned?: string; actual?: string } };
+  destination?: { location: { description: string } }[];
+  scheduleMetadata: { uniqueIdentity: string; trainReportingIdentity?: string; modeType?: string; inPassengerService?: boolean };
 }
 
-function at(s: RttService, hhmm: string | undefined, nextDay: boolean | undefined, now: number): number | null {
-  if (!hhmm) return null;
-  let t = londonTime(s.runDate, hhmm, nextDay ? 1 : 0);
-  if (!nextDay && t < now - 12 * 60 * MIN) t = londonTime(s.runDate, hhmm, 1); // ran past midnight without a flag
-  return t;
-}
-
-const isCancelled = (s: RttService) => (s.locationDetail.displayAs ?? "").startsWith("CANCELLED");
+const ms = (iso: string | undefined) => (iso ? Date.parse(iso) : NaN);
+/** Timetabled time (public, else working timetable). */
+const booked = (t: RttTimes | undefined) => { const v = ms(t?.scheduleAdvertised ?? t?.scheduleInternal); return Number.isNaN(v) ? null : v; };
+/** Best current time: actual, then forecast/estimate, then timetable. */
+const best = (t: RttTimes | undefined) => {
+  const v = ms(t?.realtimeActual ?? t?.realtimeForecast ?? t?.realtimeEstimate);
+  return Number.isNaN(v) ? booked(t) : v;
+};
+const isCancelled = (s: RttService) => s.temporalData.displayAs === "CANCELLED" || !!s.temporalData.departure?.isCancelled;
+const isBus = (s: RttService) => s.scheduleMetadata.modeType === "BUS";
 
 // ---------- Departures ----------
 
@@ -139,22 +143,22 @@ export interface Departure {
 export function parseDepartures(services: RttService[], now: number): Departure[] {
   const out: Departure[] = [];
   for (const s of services) {
-    const l = s.locationDetail;
-    if (l.isPublicCall === false || l.displayAs === "PASS" || l.displayAs === "DESTINATION" || l.displayAs === "TERMINATES") continue;
-    const scheduled = at(s, l.gbttBookedDeparture, l.gbttBookedDepartureNextDay, now);
+    const t = s.temporalData;
+    if (t.displayAs === "PASS" || t.displayAs === "TERMINATES" || s.scheduleMetadata.inPassengerService === false) continue;
+    const scheduled = booked(t.departure);
     if (scheduled == null) continue;
-    const expected = at(s, l.realtimeDeparture, l.realtimeDepartureNextDay, now) ?? scheduled;
-    if (l.realtimeDepartureActual || expected < now - MIN) continue; // already gone
+    const expected = best(t.departure) ?? scheduled;
+    if (t.departure?.realtimeActual || expected < now - MIN) continue; // already gone
     out.push({
-      uid: s.serviceUid,
+      uid: s.scheduleMetadata.uniqueIdentity,
       scheduled,
       expected,
       delayMinutes: Math.max(0, Math.round((expected - scheduled) / MIN)),
-      platform: l.platform ?? null,
-      destination: l.destination?.[0]?.description ?? WATERLOO.name,
+      platform: s.locationMetadata?.platform?.actual ?? s.locationMetadata?.platform?.planned ?? null,
+      destination: s.destination?.[0]?.location.description ?? WATERLOO.name,
       cancelled: isCancelled(s),
-      cancelReason: l.cancelReasonShortText ?? null,
-      bus: s.serviceType === "bus",
+      cancelReason: t.departure?.cancellationReasonCode ?? null,
+      bus: isBus(s),
     });
   }
   return out.sort((a, b) => a.expected - b.expected);
@@ -179,21 +183,14 @@ export interface CrossingFeed {
 export interface CrossingTrain { id: string; time: number; estimated: boolean }
 
 /** Times trains reach the crossing, from one feed. */
-export function crossingTimes(services: RttService[], feed: CrossingFeed, now: number): CrossingTrain[] {
+export function crossingTimes(services: RttService[], feed: CrossingFeed): CrossingTrain[] {
   const out: CrossingTrain[] = [];
   const sign = feed.kind === "departs" ? 1 : -1;
   for (const s of services) {
-    if (isCancelled(s) || s.serviceType === "bus") continue;
-    const l = s.locationDetail;
-    let base: number | null;
-    if (l.displayAs === "PASS") {
-      base = at(s, l.realtimePass ?? l.wttBookedPass, l.realtimePass ? l.realtimePassNextDay : l.wttBookedPassNextDay, now);
-    } else if (feed.kind === "departs") {
-      base = at(s, l.realtimeDeparture ?? l.gbttBookedDeparture ?? l.wttBookedDeparture, l.realtimeDeparture ? l.realtimeDepartureNextDay : l.gbttBookedDepartureNextDay, now);
-    } else {
-      base = at(s, l.realtimeArrival ?? l.gbttBookedArrival ?? l.wttBookedArrival, l.realtimeArrival ? l.realtimeArrivalNextDay : l.gbttBookedArrivalNextDay, now);
-    }
-    if (base != null) out.push({ id: `${s.serviceUid}:${feed.group}`, time: base + sign * feed.minutes * MIN, estimated: !!feed.estimated });
+    if (isCancelled(s) || isBus(s)) continue;
+    const t = s.temporalData;
+    const base = t.displayAs === "PASS" ? best(t.pass) : best(feed.kind === "departs" ? t.departure : t.arrival);
+    if (base != null) out.push({ id: `${s.scheduleMetadata.uniqueIdentity}:${feed.group}`, time: base + sign * feed.minutes * MIN, estimated: !!feed.estimated });
   }
   return out;
 }
