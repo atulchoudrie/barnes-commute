@@ -29,8 +29,7 @@ If Render ever stops being free, any host that runs a Dockerfile and keeps it ru
 
 - `GET /health` – whether it's connected to Network Rail.
 - `GET /debug?key=…` – the signalling area it found, trains in the Barnes–Mortlake sections, recent train moves and
-  signal changes. The area is found automatically from trains moving between the expected sections (a few minutes
-  after start); set `TD_AREA` to fix it.
+  signal changes.
 - `GET /observe?key=…&state=down` (or `up`) – when you're at the crossing, record what you can see. The reply says
   whether the live state agreed; the last 50 are in `/debug`. Use these to check the section setup below.
 
@@ -38,7 +37,7 @@ If Render ever stops being free, any host that runs a Dockerfile and keeps it ru
 
 | Variable | Default | |
 |---|---|---|
-| `TD_AREA` | found automatically | Network Rail signalling area id |
+| `TD_AREA` | `BS` (Barnes) | Network Rail signalling area id; `auto` finds it from train moves between the expected sections |
 | `BARRIER_DIRECTIONS` | see `DEFAULT_DIRECTIONS` in `td.ts` | JSON list of `{name, approach[], protect, beyond}` berths |
 | `BARRIER_CLEAR_SECONDS` | 45 | How long the barrier stays down after a train passes the protecting signal |
 | `NR_TOPIC` | `TD_ALL_SIG_AREA` | Feed topic |

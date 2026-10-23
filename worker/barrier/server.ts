@@ -14,7 +14,8 @@ if (!env.NR_USERNAME || !env.NR_PASSWORD) {
 }
 
 const tracker = new Tracker({
-  area: env.TD_AREA || null,
+  // BS is the Barnes signalling area (seen live). TD_AREA=auto finds it from train moves instead.
+  area: env.TD_AREA === "auto" ? null : env.TD_AREA || "BS",
   directions: env.BARRIER_DIRECTIONS ? (JSON.parse(env.BARRIER_DIRECTIONS) as Direction[]) : DEFAULT_DIRECTIONS,
   clearSeconds: Number(env.BARRIER_CLEAR_SECONDS) || 45,
 });
