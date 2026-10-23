@@ -44,6 +44,7 @@ If Render ever stops being free, any host that runs a Dockerfile and keeps it ru
 | `NR_TOPIC` | `TD_ALL_SIG_AREA` | Feed topic |
 | `PORT` | 8080 | |
 
-The default sections were read off the OpenTrainTimes "windsor" signalling map: towards Richmond, Barnes platform
-(523) → signal 533 → crossing → 535 (Mortlake); towards London, Mortlake platform (526) → crossing → 524. If
+The default sections were read off the OpenTrainTimes "windsor" signalling map and checked against live moves (the
+area is `BS`): towards Richmond, Barnes platforms (523 or 525) → signal 533 → crossing → 535 (Mortlake); towards
+London, Mortlake platform (526) → crossing → 524. If
 observations disagree, `/debug` shows the real train moves around the crossing to correct them.

@@ -50,11 +50,12 @@ export interface LiveConfig {
   clearSeconds: number;
 }
 
-// Read off the OpenTrainTimes "windsor" signalling map: between Barnes and Mortlake the down (towards Richmond) line
-// has signals 523 (Barnes platform) → 533 → 535 (Mortlake); the up line 528 → 526 (Mortlake platform) → 524 → 522.
-// White Hart Lane sits between 533 and 535 going down, and between 526 and 524 going up. Overridable with BARRIER_DIRECTIONS.
+// From the OpenTrainTimes "windsor" signalling map, checked against live moves in TD area BS (Barnes): towards
+// Richmond, trains leave Barnes from either platform (signals 523 or 525) into 533, then 535 (Mortlake); towards London,
+// 528 → 526 (Mortlake platform) → 524 → 522. White Hart Lane sits between 533 and 535 going down, and between 526 and
+// 524 going up. Overridable with BARRIER_DIRECTIONS.
 export const DEFAULT_DIRECTIONS: Direction[] = [
-  { name: "towards Richmond", approach: ["0523", "1090"], protect: "0533", beyond: "0535" },
+  { name: "towards Richmond", approach: ["0523", "0525", "1090"], protect: "0533", beyond: "0535" },
   { name: "towards London", approach: ["0528"], protect: "0526", beyond: "0524" },
 ];
 

@@ -45,6 +45,14 @@ test("stepping on past Mortlake clears it straight away; up trains work the same
   assert.equal(t.status(T0 + 50_000).down, false);
 });
 
+test("trains leaving Barnes from either platform count as approaching", () => {
+  const t = tracker();
+  t.apply({ type: "CC", area: "WX", time: T0, to: "0525", descr: "2025" });
+  assert.equal(t.status(T0).closingSoon, true);
+  t.apply(ca("WX", "2025", "0525", "0533", T0 + 30_000));
+  assert.equal(t.status(T0 + 30_000).down, true);
+});
+
 test("other areas with the same berth numbers are ignored", () => {
   const t = tracker();
   t.apply(ca("ZZ", "1A01", "0523", "0533"));
