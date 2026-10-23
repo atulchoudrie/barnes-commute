@@ -434,14 +434,15 @@ export function buildBoard(departures: Departure[], crossing: CrossingTrain[], c
 const minsUntil = (t: number, now: number) => Math.max(1, Math.ceil((t - now) / MIN));
 
 /**
- * "Closed for 4 min", "Open for 6 min", "Closing – down for about 8 min". Durations come from when the state next
+ * "Closed for 4 min", "Open for 6 min", "Open – train approaching, closes soon for about 8 min". Durations come from when the state next
  * changes; for a closing barrier, from the forecast closure the approaching train belongs to.
  */
 export function barrierPhrase(b: BoardBarrier, now: number): string {
   if (b.down) return b.changesAt ? `Closed for ${minsUntil(b.changesAt, now)} min` : "Closed";
   if (b.closingSoon) {
     const w = b.windows.find((x) => x.opens > now);
-    return w ? `Closing – down for about ${minsUntil(w.opens, Math.max(now, w.closes))} min` : "Closing – train approaching";
+    // Still up: a train is on its way, so it's about to close.
+    return w ? `Open – train approaching, closes soon for about ${minsUntil(w.opens, Math.max(now, w.closes))} min` : "Open – train approaching, closes soon";
   }
   return b.changesAt ? `Open for ${minsUntil(b.changesAt, now)} min` : "Open – no trains due";
 }

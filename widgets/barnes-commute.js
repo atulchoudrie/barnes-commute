@@ -77,7 +77,7 @@ function barrierLine(stack, cur, size) {
   if (cur.down) what = cur.changesAt ? `Barrier closed for ${mins(cur.changesAt)} min` : "Barrier closed";
   else if (cur.closingSoon) {
     const w = cur.windows.find((x) => x.opens > Date.now());
-    what = w ? `Barrier closing – down ~${Math.max(1, Math.ceil((w.opens - Math.max(Date.now(), w.closes)) / 60000))} min` : "Barrier closing";
+    what = w ? `Barrier open – closes soon for ~${Math.max(1, Math.ceil((w.opens - Math.max(Date.now(), w.closes)) / 60000))} min` : "Barrier open – closes soon";
   } else what = cur.changesAt ? `Barrier open for ${mins(cur.changesAt)} min` : "Barrier open";
   text(row, what + (cur.live ? " · live" : ""), size, C.text, "semibold");
 }

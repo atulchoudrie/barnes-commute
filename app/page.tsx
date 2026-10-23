@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { barrierPhrase, configFromEnv, formatClock, type Board, type BoardTrain, type ReturnTrain } from "@/lib/commute";
 import { commuteKeyOk, loadBoard } from "@/lib/rtt";
 import AutoRefresh from "./AutoRefresh";
+import ReportBarrier from "./ReportBarrier";
 
 // Phone page for Barnes → Waterloo. Add it to the home screen (Share → Add to Home Screen); it refreshes itself.
 export const dynamic = "force-dynamic";
@@ -52,7 +53,7 @@ function TrainRow({ t, first }: { t: BoardTrain; first: boolean }) {
   );
 }
 
-function BarrierCard({ b, now }: { b: Board["barrier"]; now: number }) {
+function BarrierCard({ b, now, commuteKey }: { b: Board["barrier"]; now: number; commuteKey: string }) {
   const next = b.windows.slice(0, 6);
   const span = 45 * 60_000; // timeline covers the next 45 minutes
   return (
@@ -63,7 +64,7 @@ function BarrierCard({ b, now }: { b: Board["barrier"]; now: number }) {
           {b.source === "live" && <span className="ml-2 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-brand-700">Live</span>}
         </h2>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${b.down ? "bg-red-50 text-red-700" : b.closingSoon ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
-          {b.down ? "Closed" : b.closingSoon ? "Closing" : "Open"}
+          {b.down ? "Closed" : b.closingSoon ? "Open · closing soon" : "Open"}
         </span>
       </div>
       <p className="mt-2 text-lg font-semibold">{barrierPhrase(b, now)}</p>
@@ -90,6 +91,7 @@ function BarrierCard({ b, now }: { b: Board["barrier"]; now: number }) {
           ))}
         </ul>
       )}
+      {b.source === "live" && <ReportBarrier commuteKey={commuteKey} />}
       <p className="mt-3 text-xs text-slate-400">
         {b.source === "live" ? "Now: live, from where trains are on the signalling system. Later closures: forecast from train times."
           : "Estimated from train times; the live feed isn't available right now."}
@@ -155,7 +157,7 @@ export default async function CommutePage({ searchParams }: { searchParams: Prom
         </p>
       </header>
 
-      <BarrierCard b={board.barrier} now={board.generatedAt} />
+      <BarrierCard b={board.barrier} now={board.generatedAt} commuteKey={key ?? ""} />
 
       <section className="rounded-2xl bg-white px-4 py-1 shadow-card">
         <ul>{upcoming.map((t, i) => <TrainRow key={t.uid + t.scheduled} t={t} first={i === 0} />)}</ul>

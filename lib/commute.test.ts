@@ -201,7 +201,7 @@ test("barrier wording: closed / open / closing for how long", () => {
   const base = { name: "", source: "live" as const, liveTrains: [], windows };
   assert.equal(barrierPhrase({ ...base, down: false, closingSoon: false, changesAt: at("1145") }, now), "Open for 3 min");
   assert.equal(barrierPhrase({ ...base, down: true, closingSoon: false, changesAt: at("1146") }, now), "Closed for 4 min");
-  assert.equal(barrierPhrase({ ...base, down: false, closingSoon: true, changesAt: null }, now), "Closing – down for about 10 min");
+  assert.equal(barrierPhrase({ ...base, down: false, closingSoon: true, changesAt: null }, now), "Open – train approaching, closes soon for about 10 min");
   assert.equal(barrierPhrase({ ...base, down: true, closingSoon: false, changesAt: null }, now), "Closed");
 });
 

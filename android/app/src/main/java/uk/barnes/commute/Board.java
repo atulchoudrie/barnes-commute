@@ -109,7 +109,7 @@ final class Board {
         v.setTextViewText(R.id.more, more.toString());
         v.setTextViewText(R.id.barrier, barrier);
         v.setTextViewText(R.id.updated, updated.replace("Updated ", "") + (offline ? " · offline" : ""));
-        int dot = barrier.contains("Closed") ? 0xFFFF6B6B : barrier.contains("Closing") ? 0xFFFFC857 : 0xFF7CE08A;
+        int dot = barrier.contains("Closed") ? 0xFFFF6B6B : barrier.contains("closes soon") ? 0xFFFFC857 : 0xFF7CE08A;
         v.setTextColor(R.id.barrier_dot, dot);
 
         PendingIntent open = PendingIntent.getActivity(c, 1,
