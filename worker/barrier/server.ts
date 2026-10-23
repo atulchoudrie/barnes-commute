@@ -2,6 +2,7 @@
 //   GET /status   – current state (used by the board's /api/board)
 //   GET /debug    – berths, recent train steps and signal bit changes, observations: for checking the berth setup
 //   GET /observe?state=down|up – record what you can see at the crossing, to check the live state against
+//   GET /text?key=… – the board's /api/text, relayed (for networks that block *.vercel.app)
 // All but /health need ?key=WORKER_KEY (or an x-worker-key header) when WORKER_KEY is set.
 import http from "node:http";
 import { DEFAULT_DIRECTIONS, Tracker, parseTd, type Direction, type LiveStatus } from "./td.ts";
@@ -54,6 +55,18 @@ const json = (res: http.ServerResponse, code: number, body: unknown) => {
 http.createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://x");
   if (url.pathname === "/health") return json(res, 200, { ok: true, feed });
+  // Relay for the Android widget on networks that block *.vercel.app: passes the query (including the board's own
+  // ?key=) through to the board's /api/text, which does its own key check.
+  if (url.pathname === "/text") {
+    const board = (env.BOARD_URL || "https://barnes-commute.vercel.app").replace(/\/$/, "");
+    fetch(`${board}/api/text${url.search}`, { signal: AbortSignal.timeout(20_000) })
+      .then(async (r) => {
+        res.writeHead(r.status, { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" });
+        res.end(await r.text());
+      })
+      .catch((e) => { res.writeHead(502, { "content-type": "text/plain" }); res.end(`Board unreachable: ${(e as Error).message}`); });
+    return;
+  }
   const key = env.WORKER_KEY;
   if (key && url.searchParams.get("key") !== key && req.headers["x-worker-key"] !== key) return json(res, 401, { error: "unauthorised" });
 

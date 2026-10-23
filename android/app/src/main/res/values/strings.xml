@@ -6,4 +6,6 @@
     <!-- Where the board lives, and its COMMUTE_KEY. -->
     <string name="board_url" translatable="false">https://barnes-commute.vercel.app</string>
     <string name="board_key" translatable="false">d00ca260b90f67fac02a94b8</string>
+    <!-- Same text relayed by the barrier worker, for networks that block *.vercel.app. -->
+    <string name="relay_url" translatable="false">https://barnes-barrier.onrender.com/text</string>
 </resources>

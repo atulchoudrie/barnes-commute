@@ -67,13 +67,25 @@ final class Board {
         return client;
     }
 
+    /** The board directly, or if that can't be reached (some networks block *.vercel.app) via the barrier worker's relay. */
     static String fetch(Context c) throws Exception {
-        Request req = new Request.Builder()
-                .url(c.getString(R.string.board_url) + "/api/text?key=" + c.getString(R.string.board_key))
-                .header("User-Agent", "BarnesTrainsWidget")
-                .build();
+        String query = "?key=" + c.getString(R.string.board_key);
+        try {
+            return get(c.getString(R.string.board_url) + "/api/text" + query);
+        } catch (java.io.IOException direct) {
+            try {
+                return get(c.getString(R.string.relay_url) + query);
+            } catch (Exception relay) {
+                direct.addSuppressed(relay);
+                throw direct;
+            }
+        }
+    }
+
+    private static String get(String url) throws Exception {
+        Request req = new Request.Builder().url(url).header("User-Agent", "BarnesTrainsWidget").build();
         try (Response res = client().newCall(req).execute()) {
-            if (res.code() != 200 || res.body() == null) throw new Exception("HTTP " + res.code());
+            if (res.code() != 200 || res.body() == null) throw new java.io.IOException("HTTP " + res.code());
             return res.body().string();
         }
     }
