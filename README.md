@@ -7,7 +7,7 @@ A home-screen widget and phone page showing:
 
 `/` is the phone page (refreshes itself every 30 seconds; *Add to Home Screen*). `/api/board` is the same as JSON for the widget. Set `COMMUTE_KEY` and add `?key=…` to both to keep them private.
 
-Everything here runs on free plans: Vercel (this app), Render + cron-job.org (the live barrier worker), and free Realtime Trains and Network Rail data accounts.
+Everything here runs on free plans: Vercel (this app), Render (the live barrier worker), and free Realtime Trains and Network Rail data accounts.
 
 ## Setup
 

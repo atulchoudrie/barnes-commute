@@ -36,6 +36,16 @@ runStomp({
   },
 });
 
+// Render's free plan puts a service to sleep after 15 minutes without a request (and it would then lose track of the
+// trains), so the worker visits its own public address every 10 minutes. Render sets RENDER_EXTERNAL_URL.
+const selfUrl = env.KEEP_AWAKE_URL || env.RENDER_EXTERNAL_URL;
+if (selfUrl) {
+  setInterval(() => {
+    fetch(`${selfUrl.replace(/\/$/, "")}/health`, { signal: AbortSignal.timeout(20_000) })
+      .catch((e) => console.log(new Date().toISOString(), "keep-awake ping failed:", (e as Error).message));
+  }, 10 * 60_000);
+}
+
 const json = (res: http.ServerResponse, code: number, body: unknown) => {
   res.writeHead(code, { "content-type": "application/json", "cache-control": "no-store" });
   res.end(JSON.stringify(body));

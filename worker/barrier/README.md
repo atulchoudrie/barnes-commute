@@ -17,9 +17,10 @@ No dependencies; Node 22.
    - `WORKER_KEY` – the same value as `BARRIER_LIVE_KEY` in Vercel
 
    When it's deployed, copy the service address (e.g. `https://barnes-barrier.onrender.com`).
-3. **Keep it awake**: free Render services sleep after 15 minutes without a request, and lose track of the trains.
-   At https://cron-job.org (free) create a job that opens `https://<your service>/health` every 10 minutes.
-   One free service running all month fits inside Render's 750 free hours.
+3. **Keeping it awake** is automatic: free Render services sleep after 15 minutes without a request (and would lose
+   track of the trains), so the worker visits its own address (`RENDER_EXTERNAL_URL`, set by Render) every 10
+   minutes. On another host, set `KEEP_AWAKE_URL` or use an external pinger. One service running all month fits
+   inside Render's 750 free hours.
 4. **Vercel**: set `BARRIER_LIVE_URL` to the service address and redeploy.
 
 If Render ever stops being free, any host that runs a Dockerfile and keeps it running works the same way
