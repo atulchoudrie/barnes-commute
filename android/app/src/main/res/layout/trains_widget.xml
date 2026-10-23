@@ -24,7 +24,8 @@
         android:textColor="#E6FFFFFF" android:textSize="14sp"
         android:maxLines="2" />
 
-    <View android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
+    <!-- Spacer. Widgets only allow certain view classes (not a plain View), hence FrameLayout. -->
+    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
 
     <LinearLayout
         android:layout_width="match_parent" android:layout_height="wrap_content"
