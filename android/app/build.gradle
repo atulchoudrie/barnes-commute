@@ -3,15 +3,15 @@ plugins {
 }
 
 android {
-    namespace "uk.barnes.commute"
-    compileSdk 35
+    namespace = "uk.barnes.commute"
+    compileSdk = 35
 
     defaultConfig {
-        applicationId "uk.barnes.commute"
-        minSdk 26
-        targetSdk 35
-        versionCode (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
-        versionName "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}"
+        applicationId = "uk.barnes.commute"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = Integer.parseInt(System.getenv("GITHUB_RUN_NUMBER") ?: "1")
+        versionName = "1.0." + (System.getenv("GITHUB_RUN_NUMBER") ?: "0")
     }
 
     // One fixed key, so each new build installs over the last one.

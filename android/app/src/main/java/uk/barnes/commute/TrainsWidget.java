@@ -110,7 +110,7 @@ public class TrainsWidget extends AppWidgetProvider {
         v.setTextViewText(R.id.more, more.toString());
         v.setTextViewText(R.id.barrier, barrier);
         v.setTextViewText(R.id.updated, updated.replace("Updated ", "") + (offline ? " · offline" : ""));
-        int dot = barrier.contains("DOWN") ? 0xFFFF6B6B : barrier.contains("CLOSING") ? 0xFFFFC857 : 0xFF7CE08A;
+        int dot = barrier.contains("Closed") ? 0xFFFF6B6B : barrier.contains("Closing") ? 0xFFFFC857 : 0xFF7CE08A;
         v.setTextColor(R.id.barrier_dot, dot);
 
         PendingIntent open = PendingIntent.getActivity(c, 1,

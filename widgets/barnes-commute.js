@@ -72,9 +72,14 @@ function barrierLine(stack, cur, size) {
   const dot = row.addText("● ");
   dot.font = Font.systemFont(size);
   dot.textColor = cur.down ? C.red : cur.closingSoon ? C.amber : C.green;
-  const what = cur.down ? "Barrier down" : cur.closingSoon ? "Barrier closing" : "Barrier open";
-  const when = cur.closingSoon || !cur.changesAt ? "" : cur.down ? ` · opens ~${clock(cur.changesAt)}` : ` · shuts ~${clock(cur.changesAt)}`;
-  text(row, what + when + (cur.live ? " · live" : ""), size, C.text, "semibold");
+  const mins = (t) => Math.max(1, Math.ceil((t - Date.now()) / 60000));
+  let what;
+  if (cur.down) what = cur.changesAt ? `Barrier closed for ${mins(cur.changesAt)} min` : "Barrier closed";
+  else if (cur.closingSoon) {
+    const w = cur.windows.find((x) => x.opens > Date.now());
+    what = w ? `Barrier closing – down ~${Math.max(1, Math.ceil((w.opens - Math.max(Date.now(), w.closes)) / 60000))} min` : "Barrier closing";
+  } else what = cur.changesAt ? `Barrier open for ${mins(cur.changesAt)} min` : "Barrier open";
+  text(row, what + (cur.live ? " · live" : ""), size, C.text, "semibold");
 }
 
 function build(board, family) {

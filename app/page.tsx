@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { configFromEnv, formatClock, type Board, type BoardTrain, type ReturnTrain } from "@/lib/commute";
+import { barrierPhrase, configFromEnv, formatClock, type Board, type BoardTrain, type ReturnTrain } from "@/lib/commute";
 import { commuteKeyOk, loadBoard } from "@/lib/rtt";
 import AutoRefresh from "./AutoRefresh";
 
@@ -49,12 +49,6 @@ function TrainRow({ t, first }: { t: BoardTrain; first: boolean }) {
   );
 }
 
-function barrierHeadline(b: Board["barrier"]): string {
-  if (b.down) return b.changesAt ? `Down – opens about ${formatClock(b.changesAt)}` : "Down";
-  if (b.closingSoon) return "Closing – train approaching";
-  return b.changesAt ? `Open until about ${formatClock(b.changesAt)}` : "Open – no trains due";
-}
-
 function BarrierCard({ b, now }: { b: Board["barrier"]; now: number }) {
   const next = b.windows.slice(0, 6);
   const span = 45 * 60_000; // timeline covers the next 45 minutes
@@ -66,10 +60,13 @@ function BarrierCard({ b, now }: { b: Board["barrier"]; now: number }) {
           {b.source === "live" && <span className="ml-2 rounded bg-brand-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-brand-700">Live</span>}
         </h2>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${b.down ? "bg-red-50 text-red-700" : b.closingSoon ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
-          {b.down ? "Down" : b.closingSoon ? "Closing" : "Open"}
+          {b.down ? "Closed" : b.closingSoon ? "Closing" : "Open"}
         </span>
       </div>
-      <p className="mt-2 text-lg font-semibold">{barrierHeadline(b)}</p>
+      <p className="mt-2 text-lg font-semibold">{barrierPhrase(b, now)}</p>
+      {b.changesAt && !b.closingSoon && (
+        <p className="text-xs text-slate-500">{b.down ? "Opens" : "Closes"} about {formatClock(b.changesAt)}</p>
+      )}
       {b.liveTrains.length > 0 && (
         <p className="text-xs text-slate-500">{b.liveTrains.map((t) => `${t.descr} ${t.direction}`).join(" · ")}</p>
       )}

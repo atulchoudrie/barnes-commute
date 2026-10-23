@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyLive, autoJourney, barrierStatus, summaryText, parseReturns, parseUkTime, barrierWindows, buildBoard, configFromEnv, crossingTimes, formatClock, londonTime, parseDepartures, planLeave, walkMinutesFrom, type CommuteConfig, type RttService } from "./commute.ts";
+import { applyLive, autoJourney, barrierPhrase, barrierStatus, summaryText, parseReturns, parseUkTime, barrierWindows, buildBoard, configFromEnv, crossingTimes, formatClock, londonTime, parseDepartures, planLeave, walkMinutesFrom, type CommuteConfig, type RttService } from "./commute.ts";
 
 const DAY = "2026-10-23"; // BST (UTC+1)
 const at = (hhmm: string) => londonTime(DAY, hhmm);
@@ -189,8 +189,18 @@ test("plain-text summary for Android widgets, and which way it shows by time of 
     "Barnes → Waterloo",
     "Leave 08:07 for the 08:16 (exp 08:18) P3",
     "08:31 – leave 08:20",
-    "Barrier open",
+    "Barrier: Open – no trains due",
     "Updated 08:00",
   ].join("\n"));
   assert.equal(summaryText(board, "from", now).split("\n")[1], "08:30 P22 → Barnes 08:48");
+});
+
+test("barrier wording: closed / open / closing for how long", () => {
+  const now = at("1142");
+  const windows = [{ closes: at("1145"), opens: at("1155"), trains: 4 }, { closes: at("1158"), opens: at("1205"), trains: 3 }];
+  const base = { name: "", source: "live" as const, liveTrains: [], windows };
+  assert.equal(barrierPhrase({ ...base, down: false, closingSoon: false, changesAt: at("1145") }, now), "Open for 3 min");
+  assert.equal(barrierPhrase({ ...base, down: true, closingSoon: false, changesAt: at("1146") }, now), "Closed for 4 min");
+  assert.equal(barrierPhrase({ ...base, down: false, closingSoon: true, changesAt: null }, now), "Closing – down for about 10 min");
+  assert.equal(barrierPhrase({ ...base, down: true, closingSoon: false, changesAt: null }, now), "Closed");
 });

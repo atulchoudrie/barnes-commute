@@ -385,6 +385,23 @@ export function buildBoard(departures: Departure[], crossing: CrossingTrain[], c
   };
 }
 
+// ---------- Barrier wording ----------
+
+const minsUntil = (t: number, now: number) => Math.max(1, Math.ceil((t - now) / MIN));
+
+/**
+ * "Closed for 4 min", "Open for 6 min", "Closing – down for about 8 min". Durations come from when the state next
+ * changes; for a closing barrier, from the forecast closure the approaching train belongs to.
+ */
+export function barrierPhrase(b: BoardBarrier, now: number): string {
+  if (b.down) return b.changesAt ? `Closed for ${minsUntil(b.changesAt, now)} min` : "Closed";
+  if (b.closingSoon) {
+    const w = b.windows.find((x) => x.opens > now);
+    return w ? `Closing – down for about ${minsUntil(w.opens, Math.max(now, w.closes))} min` : "Closing – train approaching";
+  }
+  return b.changesAt ? `Open for ${minsUntil(b.changesAt, now)} min` : "Open – no trains due";
+}
+
 // ---------- Plain-text summary (Android widget apps) ----------
 
 /** "to" Waterloo before 1pm, "from" Waterloo from 1pm until 3am (UK time). */
@@ -399,9 +416,7 @@ export function autoJourney(now: number): "to" | "from" {
  */
 export function summaryText(board: Board, journey: "to" | "from", now: number): string {
   const b = board.barrier;
-  const barrier = `Barrier ${b.down ? "DOWN" : b.closingSoon ? "CLOSING" : "open"}`
-    + (b.changesAt && !b.closingSoon ? `${b.down ? ", opens" : " until"} ~${formatClock(b.changesAt)}` : "")
-    + (b.source === "live" ? " (live)" : "");
+  const barrier = `Barrier: ${barrierPhrase(b, now)}${b.source === "live" ? " (live)" : ""}`;
   const lines: string[] = [];
   if (journey === "to") {
     const trains = board.trains.filter((t) => t.catchable).slice(0, 3);
