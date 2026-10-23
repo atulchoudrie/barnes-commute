@@ -110,6 +110,7 @@ export interface RttService {
     scheduledCallType?: string | null;
   };
   locationMetadata?: { platform?: { planned?: string; actual?: string } };
+  origin?: { location: { description: string } }[];
   destination?: { location: { description: string }; temporalData?: RttTimes }[];
   scheduleMetadata: { uniqueIdentity: string; trainReportingIdentity?: string; modeType?: string; inPassengerService?: boolean };
 }
@@ -132,6 +133,8 @@ const best = (t: RttTimes | undefined) => {
 };
 const isCancelled = (s: RttService) => s.temporalData.displayAs === "CANCELLED" || !!s.temporalData.departure?.isCancelled;
 const isBus = (s: RttService) => s.scheduleMetadata.modeType === "BUS";
+const isLoop = (s: RttService) =>
+  !!s.origin?.some((o) => o.location.description === WATERLOO.name) && !!s.destination?.some((d) => d.location.description === WATERLOO.name);
 
 /**
  * Where the train is going today: destinations cut from the journey (e.g. a train terminating short) are marked
@@ -210,6 +213,10 @@ export function crossingTimes(services: RttService[], feed: CrossingFeed): Cross
   const sign = feed.kind === "departs" ? 1 : -1;
   for (const s of services) {
     if (isCancelled(s) || isBus(s)) continue;
+    // Estimated feeds (Clapham Junction ⇄ Richmond) are there for fast trains that skip Mortlake. Loop services
+    // (Waterloo round to Waterloo) also run between those stations the other way round, via Hounslow and Barnes
+    // Bridge, without crossing White Hart Lane; loops that do cross it stop at Mortlake and are already counted.
+    if (feed.estimated && isLoop(s)) continue;
     const t = s.temporalData;
     const base = t.displayAs === "PASS" ? best(t.pass) : best(feed.kind === "departs" ? t.departure : t.arrival);
     if (base != null) out.push({ id: `${s.scheduleMetadata.uniqueIdentity}:${feed.group}`, time: base + sign * feed.minutes * MIN, estimated: !!feed.estimated });

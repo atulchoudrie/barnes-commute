@@ -244,3 +244,19 @@ test("trains home take the Waterloo board's destination and platform", () => {
   assert.deepEqual(labelled.map((t) => [t.destination, t.platform]), [["Teddington", "22"], ["Twickenham", "21"]]);
   assert.equal(withStationBoard(returns, null), returns);
 });
+
+test("barrier estimates skip loop trains, which go round via Hounslow without crossing White Hart Lane", () => {
+  const fast = svc("F", { dep: { s: "1830" } });
+  fast.origin = [{ location: { description: "London Waterloo" } }];
+  fast.destination = [{ location: { description: "Reading" } }];
+  const loop = svc("L", { dep: { s: "1832" } });
+  loop.origin = [{ location: { description: "London Waterloo" } }];
+  loop.destination = [{ location: { description: "London Waterloo" } }];
+  const est = { kind: "departs" as const, minutes: 6, group: "down", estimated: true };
+  assert.deepEqual(crossingTimes([fast, loop], est).map((c) => c.id), ["F:down"]);
+  // From the Mortlake times (not estimated), a loop train does count.
+  const loopAtMortlake = svc("L", { arr: { s: "1840" } });
+  loopAtMortlake.origin = loop.origin;
+  loopAtMortlake.destination = loop.destination;
+  assert.equal(crossingTimes([loopAtMortlake], { kind: "arrives", minutes: 1, group: "down" }).length, 1);
+});
