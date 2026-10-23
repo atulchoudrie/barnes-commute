@@ -6,7 +6,7 @@ whether the White Hart Lane level-crossing barrier is down. The board and widget
 It has to run all the time (the feed is a constant stream), so it's a small Docker service rather than a Vercel function.
 No dependencies; Node 22.
 
-## Deploy for free (Render + cron-job.org, about 10 minutes, no card needed)
+## Deploy for free (Render, about 10 minutes, no card needed)
 
 1. **Network Rail feed**: register at https://publicdatafeeds.networkrail.co.uk, confirm the email, and under
    **My feeds** subscribe to **TD** (all areas).
