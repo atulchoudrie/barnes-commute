@@ -8,11 +8,16 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.widget.RemoteViews;
 
-import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.nio.charset.StandardCharsets;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.Dns;
+import okhttp3.HttpUrl;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.dnsoverhttps.DnsOverHttps;
 
 /** Fetches the board's plain-text summary (/api/text) and draws it on every copy of the widget. Call off the main thread. */
 final class Board {
@@ -28,28 +33,48 @@ final class Board {
         } catch (Exception e) {
             String last = prefs.getString("last", null);
             String why = e.getClass().getSimpleName() + (e.getMessage() != null ? ": " + e.getMessage() : "");
-            text = last != null ? last + "\n(offline)" : "Barnes trains\nCan't reach the board\n" + why + "\n\nTap to retry\n";
+            String at = new java.text.SimpleDateFormat("HH:mm", java.util.Locale.UK).format(new java.util.Date());
+            text = last != null ? last + "\n(offline)" : "Barnes trains\nCan't reach the board\n" + why + "\n\nTried " + at + " · tap to retry\n";
         }
         draw(app, text);
     }
 
-    static String fetch(Context c) throws Exception {
-        URL url = new URL(c.getString(R.string.board_url) + "/api/text?key=" + c.getString(R.string.board_key));
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setConnectTimeout(10_000);
-        conn.setReadTimeout(15_000);
-        conn.setRequestProperty("User-Agent", "BarnesTrainsWidget");
+    private static OkHttpClient client;
+
+    /**
+     * Looks addresses up the normal way, and if that fails asks Cloudflare over HTTPS (as Chrome's "Secure DNS"
+     * does) – some home networks can't resolve *.vercel.app even though the browser can.
+     */
+    private static synchronized OkHttpClient client() {
+        if (client != null) return client;
+        OkHttpClient bootstrap = new OkHttpClient.Builder().connectTimeout(10, TimeUnit.SECONDS).build();
         try {
-            int code = conn.getResponseCode();
-            if (code != 200) throw new Exception("HTTP " + code);
-            try (InputStream in = conn.getInputStream()) {
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                byte[] buf = new byte[4096];
-                for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
-                return out.toString(StandardCharsets.UTF_8.name());
-            }
-        } finally {
-            conn.disconnect();
+            DnsOverHttps doh = new DnsOverHttps.Builder().client(bootstrap)
+                    .url(HttpUrl.get("https://cloudflare-dns.com/dns-query"))
+                    .bootstrapDnsHosts(InetAddress.getByName("1.1.1.1"), InetAddress.getByName("1.0.0.1"))
+                    .build();
+            Dns dns = hostname -> {
+                try {
+                    return Dns.SYSTEM.lookup(hostname);
+                } catch (UnknownHostException e) {
+                    return doh.lookup(hostname);
+                }
+            };
+            client = bootstrap.newBuilder().dns(dns).readTimeout(15, TimeUnit.SECONDS).build();
+        } catch (UnknownHostException e) { // IP literals never need a lookup; can't happen
+            client = bootstrap;
+        }
+        return client;
+    }
+
+    static String fetch(Context c) throws Exception {
+        Request req = new Request.Builder()
+                .url(c.getString(R.string.board_url) + "/api/text?key=" + c.getString(R.string.board_key))
+                .header("User-Agent", "BarnesTrainsWidget")
+                .build();
+        try (Response res = client().newCall(req).execute()) {
+            if (res.code() != 200 || res.body() == null) throw new Exception("HTTP " + res.code());
+            return res.body().string();
         }
     }
 
