@@ -83,27 +83,30 @@ test("a barrier closure on the walk makes you leave earlier", () => {
 
 test("crossing times: before arriving at Mortlake, after leaving it, passes and estimates", () => {
   const down = crossingTimes([svc("D", { arr: { s: "0810", f: "0811" } })], { kind: "arrives", minutes: 1, group: "down" });
-  assert.deepEqual(down[0], { id: "D:down", time: at("0810"), estimated: false });
+  assert.deepEqual(down[0], { id: "D", time: at("0810"), estimated: false });
   const up = crossingTimes([svc("U", { dep: { s: "0820", f: "0820" } })], { kind: "departs", minutes: 1, group: "up" });
   assert.equal(up[0].time, at("0821"));
   const pass = crossingTimes([svc("P", { displayAs: "PASS", pass: { s: "0825", f: "0825H" } })], { kind: "arrives", minutes: 1, group: "down" });
   assert.equal(pass[0].time, at("0824") + 30_000);
   const est = crossingTimes([svc("F", { dep: { s: "0830" } })], { kind: "departs", minutes: 6, group: "down", estimated: true });
-  assert.deepEqual(est[0], { id: "F:down", time: at("0836"), estimated: true });
+  assert.deepEqual(est[0], { id: "F", time: at("0836"), estimated: true });
   assert.equal(crossingTimes([svc("C", { arr: { s: "0830" }, displayAs: "CANCELLED" })], { kind: "arrives", minutes: 1, group: "down" }).length, 0);
   assert.equal(crossingTimes([svc("Bus", { arr: { s: "0830" }, mode: "BUS" })], { kind: "arrives", minutes: 1, group: "down" }).length, 0);
 });
 
-test("barrier windows merge back-to-back trains and prefer real times over estimates", () => {
+test("barrier windows: each train once, overlapping closures joined, gaps stay open", () => {
   const w = barrierWindows([
-    { id: "A:d", time: at("0810"), estimated: false },
-    { id: "A:d", time: at("0812"), estimated: true }, // same train from the Clapham feed – ignored
-    { id: "B:u", time: at("0814"), estimated: false }, // closes 08:11, within a minute of A opening → one closure
-    { id: "A:u", time: at("0840"), estimated: true }, // same train, other direction (on its way back) – kept
+    { id: "A", time: at("0810"), estimated: false }, // down 08:07–08:11
+    { id: "A", time: at("0812"), estimated: true }, // same train from the Clapham feed – ignored
+    { id: "B", time: at("0814"), estimated: false }, // 08:11–08:15, touches A → one closure
+    { id: "L", time: at("0840"), estimated: false }, // a loop train, listed "from Barnes"…
+    { id: "L", time: at("0841"), estimated: false }, // …and "to Barnes" – counted once
   ], cfg);
   assert.equal(w.length, 2);
   assert.deepEqual(w[0], { closes: at("0807"), opens: at("0815"), trains: 2 });
-  assert.equal(w[1].closes, at("0837"));
+  assert.deepEqual(w[1], { closes: at("0837"), opens: at("0841"), trains: 1 });
+  // A train whose closure starts after the last one ends gets its own, with the barrier up in between.
+  assert.equal(barrierWindows([{ id: "A", time: at("0810"), estimated: false }, { id: "C", time: at("0815"), estimated: false }], cfg).length, 2);
 
   assert.deepEqual(barrierStatus(w, at("0800")), { down: false, changesAt: at("0807"), windows: w });
   const down = barrierStatus(w, at("0810"));
@@ -253,7 +256,7 @@ test("barrier estimates skip loop trains, which go round via Hounslow without cr
   loop.origin = [{ location: { description: "London Waterloo" } }];
   loop.destination = [{ location: { description: "London Waterloo" } }];
   const est = { kind: "departs" as const, minutes: 6, group: "down", estimated: true };
-  assert.deepEqual(crossingTimes([fast, loop], est).map((c) => c.id), ["F:down"]);
+  assert.deepEqual(crossingTimes([fast, loop], est).map((c) => c.id), ["F"]);
   // From the Mortlake times (not estimated), a loop train does count.
   const loopAtMortlake = svc("L", { arr: { s: "1840" } });
   loopAtMortlake.origin = loop.origin;

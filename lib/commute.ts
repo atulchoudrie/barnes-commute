@@ -204,7 +204,10 @@ export interface CrossingFeed {
   estimated?: boolean;
 }
 
-/** `id` is the train plus direction, so a train seen in two feeds for the same direction is only counted once. */
+/**
+ * `id` is the train, so it's counted once however many feeds list it: a train crosses White Hart Lane only once, but
+ * a loop train calls at Barnes before and after Mortlake, so it appears in both the "from Barnes" and "to Barnes" feeds.
+ */
 export interface CrossingTrain { id: string; time: number; estimated: boolean }
 
 /** Times trains reach the crossing, from one feed. */
@@ -219,7 +222,7 @@ export function crossingTimes(services: RttService[], feed: CrossingFeed): Cross
     if (feed.estimated && isLoop(s)) continue;
     const t = s.temporalData;
     const base = t.displayAs === "PASS" ? best(t.pass) : best(feed.kind === "departs" ? t.departure : t.arrival);
-    if (base != null) out.push({ id: `${s.scheduleMetadata.uniqueIdentity}:${feed.group}`, time: base + sign * feed.minutes * MIN, estimated: !!feed.estimated });
+    if (base != null) out.push({ id: s.scheduleMetadata.uniqueIdentity, time: base + sign * feed.minutes * MIN, estimated: !!feed.estimated });
   }
   return out;
 }
@@ -228,7 +231,7 @@ export interface BarrierWindow { closes: number; opens: number; trains: number }
 
 /**
  * When the barrier is down: each train closes it from `closeBefore` until `openAfter` around its crossing time.
- * Closures less than a minute apart are joined, since the barrier stays down between them.
+ * Overlapping closures are joined (the barrier stays down); any gap between them shows as open.
  * A train already seen in a more accurate feed (same id) is only counted once.
  */
 export function barrierWindows(trains: CrossingTrain[], cfg: Pick<CommuteConfig, "barrierCloseBeforeMinutes" | "barrierOpenAfterMinutes">): BarrierWindow[] {
@@ -242,7 +245,7 @@ export function barrierWindows(trains: CrossingTrain[], cfg: Pick<CommuteConfig,
   for (const t of sorted) {
     const closes = t.time - cfg.barrierCloseBeforeMinutes * MIN, opens = t.time + cfg.barrierOpenAfterMinutes * MIN;
     const last = out[out.length - 1];
-    if (last && closes - last.opens < MIN) { last.opens = Math.max(last.opens, opens); last.trains++; }
+    if (last && closes <= last.opens) { last.opens = Math.max(last.opens, opens); last.trains++; }
     else out.push({ closes, opens, trains: 1 });
   }
   return out;
