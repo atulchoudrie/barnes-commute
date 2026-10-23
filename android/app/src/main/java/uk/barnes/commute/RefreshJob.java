@@ -20,12 +20,19 @@ public class RefreshJob extends JobService {
                 .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY);
     }
 
+    // Scheduling problems must never crash the app or the widget; the next update or tap tries again.
     static void schedule(Context c) {
-        if (jobs(c).getPendingJob(PERIODIC) == null) jobs(c).schedule(job(c, PERIODIC).setPeriodic(15 * 60_000L).build());
+        try {
+            if (jobs(c).getPendingJob(PERIODIC) == null) jobs(c).schedule(job(c, PERIODIC).setPeriodic(15 * 60_000L).build());
+        } catch (RuntimeException ignored) {
+        }
     }
 
     static void runNow(Context c) {
-        jobs(c).schedule(job(c, NOW).setOverrideDeadline(5_000L).build());
+        try {
+            jobs(c).schedule(job(c, NOW).setOverrideDeadline(5_000L).build());
+        } catch (RuntimeException ignored) {
+        }
     }
 
     static void cancel(Context c) {
