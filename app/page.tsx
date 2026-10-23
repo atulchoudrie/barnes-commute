@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { configFromEnv, formatClock, type Board, type BoardTrain } from "@/lib/commute";
+import { configFromEnv, formatClock, type Board, type BoardTrain, type ReturnTrain } from "@/lib/commute";
 import { commuteKeyOk, loadBoard } from "@/lib/rtt";
 import AutoRefresh from "./AutoRefresh";
 
@@ -92,6 +92,28 @@ function BarrierCard({ b, now }: { b: Board["barrier"]; now: number }) {
   );
 }
 
+function ReturnRow({ t, first }: { t: ReturnTrain; first: boolean }) {
+  return (
+    <li className={`flex items-center justify-between gap-3 py-3 ${first ? "" : "border-t border-slate-200"}`}>
+      <div>
+        <div className="text-lg font-semibold tabular-nums">
+          {formatClock(t.scheduled)}
+          {t.cancelled ? <span className="ml-2 text-sm font-medium text-red-600">Cancelled</span>
+            : t.delayMinutes > 0 ? <span className="ml-2 text-sm font-medium text-amber-600">exp {formatClock(t.expected)}</span>
+            : <span className="ml-2 text-sm font-medium text-emerald-600">On time</span>}
+        </div>
+        <div className="text-xs text-slate-500">{t.bus ? "Bus · " : ""}{t.platform ? `Platform ${t.platform}` : "Platform not yet announced"} · to {t.destination}</div>
+      </div>
+      {!t.cancelled && t.arriveExpected != null && (
+        <div className="text-right">
+          <div className="text-sm font-medium tabular-nums">Barnes {formatClock(t.arriveExpected)}</div>
+          {t.homeAt != null && <div className="text-xs text-slate-500 tabular-nums">Home {formatClock(t.homeAt)}</div>}
+        </div>
+      )}
+    </li>
+  );
+}
+
 export default async function CommutePage({ searchParams }: { searchParams: Promise<{ key?: string }> }) {
   const { key } = await searchParams;
   if (!commuteKeyOk(key)) return <main className="p-6 text-sm text-slate-500">Add ?key=… to the link.</main>;
@@ -128,6 +150,14 @@ export default async function CommutePage({ searchParams }: { searchParams: Prom
       <section className="rounded-2xl bg-white px-4 py-1 shadow-card">
         <ul>{board.trains.slice(0, 8).map((t, i) => <TrainRow key={t.uid + t.scheduled} t={t} first={i === 0} />)}</ul>
         {board.trains.length === 0 && <p className="py-4 text-sm text-slate-500">No departures in the next hour or so.</p>}
+      </section>
+
+      <section>
+        <h2 className="mb-2 px-1 text-sm font-semibold text-slate-500">Back from Waterloo</h2>
+        <div className="rounded-2xl bg-white px-4 py-1 shadow-card">
+          <ul>{(board.back ?? []).slice(0, 6).map((t, i) => <ReturnRow key={t.uid + t.scheduled} t={t} first={i === 0} />)}</ul>
+          {!board.back?.length && <p className="py-4 text-sm text-slate-500">No trains to Barnes in the next two hours.</p>}
+        </div>
       </section>
 
       <p className="text-center text-xs text-slate-400">Updated {formatClock(board.generatedAt)} · data from Realtime Trains</p>

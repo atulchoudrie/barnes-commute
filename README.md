@@ -2,6 +2,7 @@
 
 A home-screen widget and phone page showing:
 - the next trains from Barnes to London Waterloo, and when to leave the house for each (time to get out of the door + walk + a minute spare on the platform);
+- the way home: the next trains from Waterloo to Barnes, their platform, and when you'll be at Barnes and home;
 - whether the White Hart Lane level-crossing barrier (between Barnes and Mortlake) is down, when it next changes, and a forecast of closures.
 
 `/` is the phone page (refreshes itself every 30 seconds; *Add to Home Screen*). `/api/board` is the same as JSON for the widget. Set `COMMUTE_KEY` and add `?key=…` to both to keep them private.
@@ -12,7 +13,7 @@ Everything here runs on free plans: Vercel (this app), Render + cron-job.org (th
 
 1. Sign in at the [Realtime Trains API portal](https://api-portal.rtt.io) (with a free Realtime Trains account) and request a token. The free plan allows 100 requests an hour; the app caches lookups to stay well inside that.
 2. Import this repo into Vercel (Framework: Next.js) and add the variables from `.env.example`: at least `RTT_TOKEN` and your home location (`COMMUTE_HOME_LAT` / `COMMUTE_HOME_LON` – right-click your house in Google Maps to copy them) or `COMMUTE_WALK_MINUTES`.
-3. **iPhone widget**: install [Scriptable](https://scriptable.app), paste in `widgets/barnes-commute.js`, set `BOARD_URL` at the top to `https://<your-app>/api/board?key=…`, then add a Scriptable widget (small, medium or large) to the home screen and pick the script. The "leave in" countdown keeps ticking between iOS refreshes.
+3. **iPhone widget**: install [Scriptable](https://scriptable.app), paste in `widgets/barnes-commute.js` (`BOARD_URL` at the top points at this app), then add a Scriptable widget (small, medium or large) to the home screen and pick the script. The widget shows the journey to Waterloo before 1pm and the way home after; set a widget's Parameter to `to` or `from` to fix it to one direction. Countdowns keep ticking between iOS refreshes. `/api/board?journey=to|from` fetches only one direction, which keeps a widget refreshing all day inside the free Realtime Trains limits.
 4. **Live barrier** (optional): deploy `worker/barrier` – see [its README](worker/barrier/README.md) – and set `BARRIER_LIVE_URL` / `BARRIER_LIVE_KEY`.
 
 ## How it works

@@ -1,17 +1,23 @@
-// Barnes → Waterloo home-screen widget for iPhone / iPad, using the free Scriptable app (scriptable.app).
+// Barnes ⇄ Waterloo home-screen widget for iPhone / iPad, using the free Scriptable app (scriptable.app).
 //
 // Setup:
 //   1. Install Scriptable, tap +, paste this whole file, name it "Barnes trains".
-//   2. Set BOARD_URL below to your deployment's /api/board address (add ?key=… if you set COMMUTE_KEY).
-//   3. Long-press the home screen → + → Scriptable → pick Small, Medium or Large → tap the widget while
+//   2. Long-press the home screen → + → Scriptable → pick Small, Medium or Large → tap the widget while
 //      jiggling → Script: "Barnes trains". Tapping the widget opens the full board.
 //
-// iOS decides how often widgets refresh (usually every 5–15 minutes), so the "leave in" countdown and the
-// barrier state are worked out on the phone from the times last downloaded and keep ticking between refreshes.
+// It shows the journey to Waterloo before 1pm and the journey back from Waterloo after. To fix a widget to one
+// direction, set its Parameter (same edit screen) to "to" or "from" – e.g. one widget of each.
+//
+// iOS decides how often widgets refresh (usually every 5–15 minutes), so the countdowns and the barrier state are
+// worked out on the phone from the times last downloaded and keep ticking between refreshes.
 
-const BOARD_URL = "https://YOUR-APP.vercel.app/api/board?key=YOUR_KEY";
+const BOARD_URL = "https://barnes-commute.vercel.app/api/board?key=d00ca260b90f67fac02a94b8";
+const SWITCH_HOUR = 13; // from this hour (until 3am) the widget shows the way home
 
-const url = (args.widgetParameter || BOARD_URL).trim();
+const param = (args.widgetParameter || "").trim().toLowerCase();
+const journey = param === "to" || param === "from" ? param
+  : new Date().getHours() >= SWITCH_HOUR || new Date().getHours() < 3 ? "from" : "to";
+const url = `${BOARD_URL}&journey=${journey}`;
 const C = {
   bg: Color.dynamic(new Color("#ffffff"), new Color("#1c1c1e")),
   text: Color.dynamic(new Color("#1d1d1f"), new Color("#f5f5f7")),
@@ -23,7 +29,7 @@ const clock = (t) => { const d = new Date(t); return `${String(d.getHours()).pad
 
 async function loadBoard() {
   const fm = FileManager.local();
-  const cache = fm.joinPath(fm.cacheDirectory(), "barnes-commute.json");
+  const cache = fm.joinPath(fm.cacheDirectory(), `barnes-commute-${journey}.json`);
   try {
     const req = new Request(url);
     req.timeoutInterval = 10;
@@ -74,7 +80,7 @@ function build(board, family) {
   const w = new ListWidget();
   w.backgroundColor = C.bg;
   w.setPadding(12, 14, 12, 14);
-  w.url = url.replace("/api/board", "/");
+  w.url = BOARD_URL.replace("/api/board", "/");
 
   if (board.error) {
     text(w, "Barnes trains", 13, C.dim, "semibold");
@@ -142,9 +148,68 @@ function build(board, family) {
   return w;
 }
 
+// The way home: next trains from Waterloo, their platform, and when you'll be at Barnes and home.
+function buildBack(board, family) {
+  const w = new ListWidget();
+  w.backgroundColor = C.bg;
+  w.setPadding(12, 14, 12, 14);
+  w.url = BOARD_URL.replace("/api/board", "/");
+
+  if (board.error) {
+    text(w, "Barnes trains", 13, C.dim, "semibold");
+    w.addSpacer(4);
+    const t = text(w, board.error, 12, C.red);
+    t.lineLimit = 4;
+    return w;
+  }
+
+  const now = Date.now();
+  const trains = (board.back || []).filter((t) => !t.cancelled && t.expected >= now - 30000);
+  const next = trains[0];
+
+  text(w, family === "small" ? "WAT → Barnes" : "Waterloo → Barnes", 12, C.dim, "semibold");
+  w.addSpacer(2);
+
+  if (next) {
+    const head = w.addStack();
+    head.bottomAlignContent();
+    text(head, clock(next.scheduled), family === "small" ? 24 : 28, C.text, "bold");
+    if (next.platform) text(head, `  P${next.platform}`, family === "small" ? 18 : 22, C.text, "bold");
+    const leaves = w.addStack();
+    text(leaves, next.delayMinutes > 0 ? `exp ${clock(next.expected)} · leaves in ` : "leaves in ", 13, next.delayMinutes > 0 ? C.amber : C.dim, "semibold");
+    const d = leaves.addDate(new Date(next.expected));
+    d.applyTimerStyle();
+    d.font = Font.semiboldMonospacedSystemFont(13);
+    d.textColor = C.dim;
+    if (next.arriveExpected) {
+      text(w, `Barnes ${clock(next.arriveExpected)}${next.homeAt ? ` · home ${clock(next.homeAt)}` : ""}`, 13, C.dim, "semibold");
+    }
+  } else {
+    text(w, "No trains to Barnes soon", 18, C.text, "bold");
+  }
+
+  if (family !== "small") {
+    w.addSpacer(6);
+    for (const t of trains.slice(1, family === "large" ? 8 : 3)) {
+      const row = w.addStack();
+      text(row, clock(t.scheduled), 13, C.text, "semibold");
+      if (t.delayMinutes > 0) text(row, ` exp ${clock(t.expected)}`, 13, C.amber);
+      if (t.platform) text(row, ` · P${t.platform}`, 13, C.dim);
+      row.addSpacer();
+      if (t.arriveExpected) text(row, `Barnes ${clock(t.arriveExpected)}`, 13, C.dim);
+    }
+  }
+
+  w.addSpacer();
+  text(w, `${board.stale ? "Offline · " : ""}updated ${clock(board.generatedAt)}`, 9, C.dim);
+  // Platforms at Waterloo are announced late, so ask iOS to refresh often while a train is due.
+  w.refreshAfterDate = new Date(now + (next && next.expected - now < 20 * 60000 ? 2 : 5) * 60000);
+  return w;
+}
+
 const board = await loadBoard();
 const family = config.widgetFamily || "medium";
-const widget = build(board, family);
+const widget = journey === "from" ? buildBack(board, family) : build(board, family);
 if (config.runsInWidget) Script.setWidget(widget);
 else if (family === "small") await widget.presentSmall();
 else if (family === "large") await widget.presentLarge();

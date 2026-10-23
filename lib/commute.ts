@@ -114,7 +114,15 @@ export interface RttService {
   scheduleMetadata: { uniqueIdentity: string; trainReportingIdentity?: string; modeType?: string; inPassengerService?: boolean };
 }
 
-const ms = (iso: string | undefined) => (iso ? Date.parse(iso) : NaN);
+/** ISO 8601 → epoch ms. Times without a UTC offset are UK local time (the API may leave the offset off). */
+export function parseUkTime(iso: string | undefined): number {
+  if (!iso) return NaN;
+  if (/(?:[zZ]|[+-]\d\d:?\d\d)$/.test(iso)) return Date.parse(iso);
+  const m = iso.match(/^(\d{4}-\d\d-\d\d)T(\d\d):(\d\d)(?::(\d\d))?/);
+  if (!m) return NaN;
+  return londonTime(m[1], m[2] + m[3]) + Number(m[4] ?? 0) * 1000;
+}
+const ms = parseUkTime;
 /** Timetabled time (public, else working timetable). */
 const booked = (t: RttTimes | undefined) => { const v = ms(t?.scheduleAdvertised ?? t?.scheduleInternal); return Number.isNaN(v) ? null : v; };
 /** Best current time: actual, then forecast/estimate, then timetable. */
@@ -264,6 +272,26 @@ export function planLeave(departure: number, cfg: CommuteConfig, windows: Barrie
   return { leaveAt: leave, leaveInMinutes: Math.floor((leave - now) / MIN), barrierExtraMinutes: Math.ceil((straight - leave) / MIN) };
 }
 
+// ---------- Back from Waterloo ----------
+
+export interface ReturnTrain extends Departure {
+  /** Arrival at Barnes: timetable and best current time. Null if not known yet. */
+  arriveScheduled: number | null;
+  arriveExpected: number | null;
+  /** Arrival at Barnes plus the walk home. */
+  homeAt: number | null;
+}
+
+/** Barnes-bound trains from Waterloo (departure board), joined to their arrival at Barnes (arrivals from Waterloo). */
+export function parseReturns(fromWaterloo: RttService[], atBarnes: RttService[], cfg: Pick<CommuteConfig, "walkMinutes">, now: number): ReturnTrain[] {
+  const arrivals = new Map(atBarnes.map((s) => [s.scheduleMetadata.uniqueIdentity, s.temporalData.arrival]));
+  return parseDepartures(fromWaterloo, now).map((d) => {
+    const a = arrivals.get(d.uid);
+    const arriveScheduled = booked(a), arriveExpected = best(a);
+    return { ...d, arriveScheduled, arriveExpected, homeAt: arriveExpected == null ? null : arriveExpected + cfg.walkMinutes * MIN };
+  });
+}
+
 // ---------- The board ----------
 
 export interface BoardTrain extends Departure { plan: Plan | null; catchable: boolean }
@@ -279,6 +307,8 @@ export interface Board {
   /** The first train you can still make. */
   next: BoardTrain | null;
   barrier: BoardBarrier;
+  /** Trains back from Waterloo to Barnes; null if not asked for. */
+  back: ReturnTrain[] | null;
 }
 
 export interface BoardBarrier extends BarrierStatus {
@@ -320,7 +350,7 @@ export function applyLive(b: BoardBarrier, live: LiveBarrier | null, now: number
   };
 }
 
-export function buildBoard(departures: Departure[], crossing: CrossingTrain[], cfg: CommuteConfig, now: number): Board {
+export function buildBoard(departures: Departure[], crossing: CrossingTrain[], cfg: CommuteConfig, now: number, back: ReturnTrain[] | null = null): Board {
   const windows = barrierWindows(crossing, cfg);
   const trains = departures.map((d) => {
     const plan = d.cancelled ? null : planLeave(d.expected, cfg, windows, now);
@@ -335,5 +365,6 @@ export function buildBoard(departures: Departure[], crossing: CrossingTrain[], c
     trains,
     next: trains.find((t) => t.catchable) ?? null,
     barrier: { ...barrierStatus(windows, now), name: CROSSING.name, source: "timetable", closingSoon: false, liveTrains: [] },
+    back,
   };
 }

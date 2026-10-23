@@ -1,14 +1,14 @@
 import "server-only";
-import { BARNES, CROSSING, WATERLOO, applyLive, buildBoard, crossingTimes, parseDepartures, type Board, type CommuteConfig, type CrossingFeed, type LiveBarrier, type RttService } from "./commute";
+import { BARNES, CROSSING, WATERLOO, applyLive, buildBoard, crossingTimes, parseDepartures, parseReturns, type Board, type CommuteConfig, type CrossingFeed, type LiveBarrier, type RttService } from "./commute";
 
 // Realtime Trains API (https://data.rtt.io). Token from https://api-portal.rtt.io: RTT_TOKEN.
 // The free plan allows 10 requests a minute, 100 an hour and 1,000 a day, so every lookup is cached and shared
-// between page loads and the widget (Next's data cache): departures for 4 minutes, barrier forecast for 10.
-// Worst case, viewed non-stop all day, that's about 40 requests an hour.
+// between page loads and the widget (Next's data cache): train times for 5 minutes, the barrier forecast for 15.
+// The widget only asks for the direction it's showing, so a widget refreshing all day stays well under the limits.
 const API = "https://data.rtt.io";
 const API_VERSION = "2026-04-09";
-const DEPARTURES_CACHE_S = 240;
-const BARRIER_CACHE_S = 600;
+const DEPARTURES_CACHE_S = 300;
+const BARRIER_CACHE_S = 900;
 
 // A token from the portal is either a long-life access token (used directly) or a refresh token, which is
 // exchanged for a short-life access token. Which one is found out on first use.
@@ -78,15 +78,28 @@ async function loadLive(): Promise<LiveBarrier | null> {
   }
 }
 
-export async function loadBoard(cfg: CommuteConfig, now = Date.now()): Promise<Board> {
-  const [live, departures, ...barrier] = await Promise.all([
+/** "to" Waterloo, "from" Waterloo, or both. The barrier forecast is only fetched for the journey to Waterloo. */
+export type Journey = "to" | "from" | "both";
+
+export function journeyParam(v: string | null | undefined): Journey {
+  return v === "to" || v === "from" ? v : "both";
+}
+
+export async function loadBoard(cfg: CommuteConfig, journey: Journey = "both", now = Date.now()): Promise<Board> {
+  const out = journey !== "from", back = journey !== "to";
+  const none = Promise.resolve([] as RttService[]);
+  const [live, departures, fromWaterloo, atBarnes, ...barrier] = await Promise.all([
     loadLive(),
-    location({ code: BARNES.crs, filterTo: WATERLOO.crs }, DEPARTURES_CACHE_S),
+    out ? location({ code: BARNES.crs, filterTo: WATERLOO.crs }, DEPARTURES_CACHE_S) : none,
+    back ? location({ code: WATERLOO.crs, filterTo: BARNES.crs }, DEPARTURES_CACHE_S) : none,
+    // A little longer, so trains leaving Waterloo near the end of the window still have an arrival time.
+    back ? location({ code: BARNES.crs, filterFrom: WATERLOO.crs, timeWindow: "150" }, DEPARTURES_CACHE_S).catch(() => [] as RttService[]) : none,
     // One failed barrier feed shouldn't take the train times down with it.
-    ...FEEDS.map((f) => location(f.params, BARRIER_CACHE_S).catch(() => [] as RttService[])),
+    ...(out ? FEEDS.map((f) => location(f.params, BARRIER_CACHE_S).catch(() => [] as RttService[])) : []),
   ]);
-  const crossing = FEEDS.flatMap((f, i) => crossingTimes(barrier[i], f.feed));
-  const board = buildBoard(parseDepartures(departures, now), crossing, cfg, now);
+  const crossing = out ? FEEDS.flatMap((f, i) => crossingTimes(barrier[i], f.feed)) : [];
+  const returns = back ? parseReturns(fromWaterloo, atBarnes, cfg, now) : null;
+  const board = buildBoard(parseDepartures(departures, now), crossing, cfg, now, returns);
   return { ...board, barrier: applyLive(board.barrier, live, now) };
 }
 

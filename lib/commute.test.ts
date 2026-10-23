@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyLive, barrierStatus, barrierWindows, buildBoard, configFromEnv, crossingTimes, formatClock, londonTime, parseDepartures, planLeave, walkMinutesFrom, type CommuteConfig, type RttService } from "./commute.ts";
+import { applyLive, barrierStatus, parseReturns, parseUkTime, barrierWindows, buildBoard, configFromEnv, crossingTimes, formatClock, londonTime, parseDepartures, planLeave, walkMinutesFrom, type CommuteConfig, type RttService } from "./commute.ts";
 
 const DAY = "2026-10-23"; // BST (UTC+1)
 const at = (hhmm: string) => londonTime(DAY, hhmm);
@@ -27,6 +27,15 @@ test("UK local times convert across British Summer Time", () => {
   assert.equal(new Date(londonTime("2026-12-01", "0812")).toISOString(), "2026-12-01T08:12:00.000Z");
   assert.equal(new Date(at("0812H")).toISOString(), "2026-10-23T07:12:30.000Z");
   assert.equal(formatClock(at("0812")), "08:12");
+});
+
+test("API times without an offset are read as UK time, not the server's", () => {
+  assert.equal(parseUkTime("2026-10-23T11:21:00"), at("1121"));
+  assert.equal(parseUkTime("2026-10-23T11:21"), at("1121"));
+  assert.equal(parseUkTime("2026-12-01T08:12:30"), Date.parse("2026-12-01T08:12:30Z"));
+  assert.equal(parseUkTime("2026-10-23T11:21:00+01:00"), at("1121"));
+  assert.equal(parseUkTime("2026-10-23T10:21:00Z"), at("1121"));
+  assert.ok(Number.isNaN(parseUkTime(undefined)));
 });
 
 test("walk time from a home location, or as set", () => {
@@ -140,4 +149,17 @@ test("live barrier state overrides the forecast while the feed is fresh", () => 
   assert.equal(applyLive(forecast, { ...live, lastMessageAt: now - 10 * 60_000 }, now).source, "timetable"); // stale
   assert.equal(applyLive(forecast, { ...live, feed: { state: "disconnected" } }, now).source, "timetable");
   assert.equal(applyLive(forecast, null, now).source, "timetable");
+});
+
+test("trains back from Waterloo get their Barnes arrival and a home-by time", () => {
+  const now = at("1700");
+  const fromWaterloo = [svc("R1", { dep: { s: "1712", f: "1714" }, platform: "17" }), svc("R2", { dep: { s: "1727" } })];
+  const atBarnes = [svc("R1", { arr: { s: "1728", f: "1730" } })];
+  const [r1, r2] = parseReturns(fromWaterloo, atBarnes, { walkMinutes: 12 }, now);
+  assert.equal(r1.platform, "17");
+  assert.equal(r1.delayMinutes, 2);
+  assert.equal(r1.arriveExpected, at("1730"));
+  assert.equal(r1.homeAt, at("1742"));
+  assert.equal(r2.arriveExpected, null); // not in the arrivals list yet
+  assert.equal(r2.homeAt, null);
 });
