@@ -204,3 +204,17 @@ test("barrier wording: closed / open / closing for how long", () => {
   assert.equal(barrierPhrase({ ...base, down: false, closingSoon: true, changesAt: null }, now), "Closing – down for about 10 min");
   assert.equal(barrierPhrase({ ...base, down: true, closingSoon: false, changesAt: null }, now), "Closed");
 });
+
+test("destination: skips one cut from today's journey, and names both halves of a dividing train", () => {
+  const now = at("1740");
+  const short = svc("S", { dep: { s: "1752" } });
+  short.destination = [
+    { location: { description: "Weybridge" }, temporalData: { isCancelled: true } },
+    { location: { description: "Addlestone" } },
+  ];
+  const split = svc("D", { dep: { s: "1800" } });
+  split.destination = [{ location: { description: "Windsor & Eton Riverside" } }, { location: { description: "Weybridge" } }];
+  const [a, b] = parseDepartures([short, split], now);
+  assert.equal(a.destination, "Addlestone");
+  assert.equal(b.destination, "Windsor & Eton Riverside / Weybridge");
+});

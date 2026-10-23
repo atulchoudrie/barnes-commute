@@ -110,7 +110,7 @@ export interface RttService {
     scheduledCallType?: string | null;
   };
   locationMetadata?: { platform?: { planned?: string; actual?: string } };
-  destination?: { location: { description: string } }[];
+  destination?: { location: { description: string }; temporalData?: RttTimes }[];
   scheduleMetadata: { uniqueIdentity: string; trainReportingIdentity?: string; modeType?: string; inPassengerService?: boolean };
 }
 
@@ -132,6 +132,17 @@ const best = (t: RttTimes | undefined) => {
 };
 const isCancelled = (s: RttService) => s.temporalData.displayAs === "CANCELLED" || !!s.temporalData.departure?.isCancelled;
 const isBus = (s: RttService) => s.scheduleMetadata.modeType === "BUS";
+
+/**
+ * Where the train is going today: destinations cut from the journey (e.g. a train terminating short) are marked
+ * cancelled and skipped; a train that divides has more than one.
+ */
+function destinationName(s: RttService): string | null {
+  const all = s.destination ?? [];
+  const live = all.filter((d) => !d.temporalData?.isCancelled);
+  const names = [...new Set((live.length ? live : all).map((d) => d.location.description))];
+  return names.length ? names.join(" / ") : null;
+}
 
 // ---------- Departures ----------
 
@@ -163,7 +174,7 @@ export function parseDepartures(services: RttService[], now: number): Departure[
       expected,
       delayMinutes: Math.max(0, Math.round((expected - scheduled) / MIN)),
       platform: s.locationMetadata?.platform?.actual ?? s.locationMetadata?.platform?.planned ?? null,
-      destination: s.destination?.[0]?.location.description ?? WATERLOO.name,
+      destination: destinationName(s) ?? WATERLOO.name,
       cancelled: isCancelled(s),
       cancelReason: t.departure?.cancellationReasonCode ?? null,
       bus: isBus(s),
