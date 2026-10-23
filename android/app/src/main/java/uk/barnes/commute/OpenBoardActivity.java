@@ -14,6 +14,8 @@ public class OpenBoardActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        RefreshJob.schedule(this); // opening the app also brings the widget up to date
+        RefreshJob.runNow(this);
         startActivity(new Intent(Intent.ACTION_VIEW, boardUri(this)));
         finish();
     }
