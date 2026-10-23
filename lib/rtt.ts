@@ -1,6 +1,7 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
-import { BARNES, CROSSING, WATERLOO, applyLive, buildBoard, crossingTimes, dropOvertaken, parseDepartures, parseReturns, withArrivals, type Board, type CommuteConfig, type CrossingFeed, type LiveBarrier, type RttService } from "./commute";
+import { waterlooBoardToBarnes } from "./ldb";
+import { BARNES, CROSSING, WATERLOO, applyLive, buildBoard, crossingTimes, dropOvertaken, parseDepartures, parseReturns, withArrivals, withStationBoard, type Board, type CommuteConfig, type CrossingFeed, type LiveBarrier, type RttService } from "./commute";
 
 // Realtime Trains API (https://data.rtt.io). Token from https://api-portal.rtt.io: RTT_TOKEN.
 // The free plan allows 10 requests a minute, 100 an hour and 1,000 a day, so every lookup is cached and shared
@@ -113,6 +114,8 @@ export function journeyParam(v: string | null | undefined): Journey {
 export async function loadBoard(cfg: CommuteConfig, journey: Journey = "both", now = Date.now()): Promise<Board> {
   const out = journey !== "from", back = journey !== "to";
   const none = Promise.resolve([] as RttService[]);
+  // National Rail's board, for the destinations and platforms Waterloo's screens show (free, separate from RTT).
+  const stationBoard = back ? waterlooBoardToBarnes() : Promise.resolve(null);
   const [live, departures, atWaterloo, fromWaterloo, atBarnes, ...barrier] = await Promise.all([
     loadLive(),
     out ? location({ code: BARNES.crs, filterTo: WATERLOO.crs }, DEPARTURES_CACHE_S) : none,
@@ -125,7 +128,7 @@ export async function loadBoard(cfg: CommuteConfig, journey: Journey = "both", n
     ...(out ? FEEDS.map((f) => location(f.params, BARRIER_CACHE_S).catch(() => [] as RttService[])) : []),
   ]);
   const crossing = out ? FEEDS.flatMap((f, i) => crossingTimes(barrier[i], f.feed)) : [];
-  const returns = back ? parseReturns(fromWaterloo, atBarnes, cfg, now) : null;
+  const returns = back ? withStationBoard(parseReturns(fromWaterloo, atBarnes, cfg, now), await stationBoard) : null;
   const outbound = dropOvertaken(withArrivals(parseDepartures(departures, now), atWaterloo));
   const board = buildBoard(outbound, crossing, cfg, now, returns);
   return { ...board, barrier: applyLive(board.barrier, live, now) };

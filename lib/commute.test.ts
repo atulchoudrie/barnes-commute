@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyLive, autoJourney, barrierPhrase, barrierStatus, dropOvertaken, withArrivals, summaryText, parseReturns, parseUkTime, barrierWindows, buildBoard, configFromEnv, crossingTimes, formatClock, londonTime, parseDepartures, planLeave, walkMinutesFrom, type CommuteConfig, type RttService } from "./commute.ts";
+import { applyLive, autoJourney, barrierPhrase, barrierStatus, dropOvertaken, withArrivals, withStationBoard, summaryText, parseReturns, parseUkTime, barrierWindows, buildBoard, configFromEnv, crossingTimes, formatClock, londonTime, parseDepartures, planLeave, walkMinutesFrom, type CommuteConfig, type RttService } from "./commute.ts";
 
 const DAY = "2026-10-23"; // BST (UTC+1)
 const at = (hhmm: string) => londonTime(DAY, hhmm);
@@ -228,4 +228,19 @@ test("to Waterloo: loop trains going the long way round, and a train listed twic
   const trains = dropOvertaken(withArrivals(parseDepartures([direct, loopOut, loopBack], now), atWaterloo));
   assert.deepEqual(trains.map((t) => [t.uid, formatClock(t.scheduled), t.platform]), [["D", "18:05", "3"], ["L", "18:50", "3"]]);
   assert.equal(trains[0].arriveExpected, at("1822"));
+});
+
+test("trains home take the Waterloo board's destination and platform", () => {
+  const now = at("1750");
+  const loop = svc("L", { dep: { s: "1800" }, platform: "24" });
+  loop.destination = [{ location: { description: "London Waterloo" } }];
+  const twi = svc("T", { dep: { s: "1807" }, platform: "21" });
+  twi.destination = [{ location: { description: "Twickenham" } }];
+  const returns = parseReturns([loop, twi], [svc("L", { arr: { s: "1818" } }), svc("T", { arr: { s: "1825" } })], cfg, now);
+  const labelled = withStationBoard(returns, [
+    { std: "18:00", platform: "22", destination: "Teddington", cancelled: false },
+    { std: "18:37", platform: null, destination: "Twickenham", cancelled: true },
+  ]);
+  assert.deepEqual(labelled.map((t) => [t.destination, t.platform]), [["Teddington", "22"], ["Twickenham", "21"]]);
+  assert.equal(withStationBoard(returns, null), returns);
 });

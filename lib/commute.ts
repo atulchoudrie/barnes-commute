@@ -336,6 +336,22 @@ export function parseReturns(fromWaterloo: RttService[], atBarnes: RttService[],
   return dropOvertaken(trains);
 }
 
+/** A train on a National Rail station departure board (lib/ldb.ts). `std` is the timetabled departure, "HH:MM". */
+export interface StationBoardService { std: string; platform: string | null; destination: string | null; cancelled: boolean }
+
+/**
+ * Labels trains with what the station board shows: its destination (loop trains are shown by a point on the loop,
+ * e.g. "Teddington", rather than "London Waterloo") and platform. Matched by timetabled departure time.
+ */
+export function withStationBoard<T extends Departure>(trains: T[], board: StationBoardService[] | null): T[] {
+  if (!board?.length) return trains;
+  return trains.map((t) => {
+    const s = board.find((b) => b.std === formatClock(t.scheduled));
+    if (!s) return t;
+    return { ...t, destination: s.destination ?? t.destination, platform: s.platform ?? t.platform, cancelled: t.cancelled || s.cancelled };
+  });
+}
+
 // ---------- The board ----------
 
 export interface BoardTrain extends Departure { plan: Plan | null; catchable: boolean }
