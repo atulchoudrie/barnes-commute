@@ -284,7 +284,8 @@ export interface ReturnTrain extends Departure {
 
 /**
  * Barnes-bound trains from Waterloo (departure board), joined to their arrival at Barnes (arrivals from Waterloo).
- * Hounslow loop trains call at Barnes twice – on the way out and again on the way back to Waterloo – so the first call is used.
+ * Loop services that run round and back to Waterloo can call at Barnes twice, so the first call is used; and a train
+ * that a later one beats to Barnes (e.g. a loop going the long way round) isn't worth catching, so it's left out.
  */
 export function parseReturns(fromWaterloo: RttService[], atBarnes: RttService[], cfg: Pick<CommuteConfig, "walkMinutes">, now: number): ReturnTrain[] {
   const arrivals = new Map<string, RttTimes | undefined>();
@@ -292,17 +293,19 @@ export function parseReturns(fromWaterloo: RttService[], atBarnes: RttService[],
     const uid = s.scheduleMetadata.uniqueIdentity, a = s.temporalData.arrival, seen = arrivals.get(uid);
     if (!arrivals.has(uid) || (booked(a) ?? Infinity) < (booked(seen) ?? Infinity)) arrivals.set(uid, a);
   }
-  return parseDepartures(fromWaterloo, now).map((d) => {
+  const trains = parseDepartures(fromWaterloo, now).map((d) => {
     const a = arrivals.get(d.uid);
     const arriveScheduled = booked(a), arriveExpected = best(a);
     return {
       ...d,
-      destination: d.destination === WATERLOO.name ? "Hounslow loop" : d.destination, // goes round and back to Waterloo
+      destination: d.destination === WATERLOO.name ? "loop back to Waterloo" : d.destination,
       arriveScheduled,
       arriveExpected,
       homeAt: arriveExpected == null ? null : arriveExpected + cfg.walkMinutes * MIN,
     };
   });
+  return trains.filter((t) => t.arriveExpected == null || !trains.some((o) =>
+    o !== t && !o.cancelled && o.expected > t.expected && o.arriveExpected != null && o.arriveExpected < t.arriveExpected!));
 }
 
 // ---------- The board ----------

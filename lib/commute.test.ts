@@ -164,11 +164,15 @@ test("trains back from Waterloo get their Barnes arrival and a home-by time", ()
   assert.equal(r2.homeAt, null);
 });
 
-test("Hounslow loop trains use their first call at Barnes, not the one on the way back round", () => {
+test("loop trains use their first call at Barnes, and trains beaten to Barnes by a later one are left out", () => {
   const now = at("1120");
   const loop = svc("L", { dep: { s: "1127" } });
   loop.destination = [{ location: { description: "London Waterloo" } }];
-  const [r] = parseReturns([loop], [svc("L", { arr: { s: "1226" } }), svc("L", { arr: { s: "1144" } })], { walkMinutes: 12 }, now);
-  assert.equal(r.arriveExpected, at("1144"));
-  assert.equal(r.destination, "Hounslow loop");
+  const direct = svc("D", { dep: { s: "1130" } });
+  const atBarnes = [svc("L", { arr: { s: "1226" } }), svc("L", { arr: { s: "1244" } }), svc("D", { arr: { s: "1148" } })];
+  // The loop goes the long way round and reaches Barnes at 12:26; the 11:30 gets there at 11:48.
+  assert.deepEqual(parseReturns([loop, direct], atBarnes, { walkMinutes: 12 }, now).map((r) => r.uid), ["D"]);
+  const [alone] = parseReturns([loop], atBarnes, { walkMinutes: 12 }, now);
+  assert.equal(alone.arriveExpected, at("1226"));
+  assert.equal(alone.destination, "loop back to Waterloo");
 });
