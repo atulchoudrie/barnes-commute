@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="18dp"
+    android:background="@drawable/widget_background">
+
+    <TextView android:id="@+id/title"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:textColor="#CCFFFFFF" android:textSize="13sp" android:textStyle="bold"
+        android:maxLines="1" android:text="Barnes trains" />
+
+    <TextView android:id="@+id/headline"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textColor="#FFFFFF" android:textSize="22sp" android:textStyle="bold"
+        android:maxLines="2" android:text="Loading…" />
+
+    <TextView android:id="@+id/more"
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textColor="#E6FFFFFF" android:textSize="14sp"
+        android:maxLines="2" />
+
+    <View android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" />
+
+    <LinearLayout
+        android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/barrier_dot"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textSize="14sp" android:text="● " android:textColor="#7CE08A" />
+        <TextView android:id="@+id/barrier"
+            android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:textColor="#FFFFFF" android:textSize="14sp" android:textStyle="bold"
+            android:maxLines="1" android:ellipsize="end" />
+        <TextView android:id="@+id/updated"
+            android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:textColor="#99FFFFFF" android:textSize="11sp" />
+    </LinearLayout>
+</LinearLayout>

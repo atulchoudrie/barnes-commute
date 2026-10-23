@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Barnes trains</string>
+    <string name="widget_name">Barnes trains</string>
+    <string name="widget_description">When to leave for Waterloo, the way home, and the White Hart Lane barrier</string>
+    <!-- Where the board lives, and its COMMUTE_KEY. -->
+    <string name="board_url" translatable="false">https://barnes-commute.vercel.app</string>
+    <string name="board_key" translatable="false">d00ca260b90f67fac02a94b8</string>
+</resources>

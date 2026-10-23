@@ -384,3 +384,48 @@ export function buildBoard(departures: Departure[], crossing: CrossingTrain[], c
     back,
   };
 }
+
+// ---------- Plain-text summary (Android widget apps) ----------
+
+/** "to" Waterloo before 1pm, "from" Waterloo from 1pm until 3am (UK time). */
+export function autoJourney(now: number): "to" | "from" {
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/London", hour: "2-digit", hourCycle: "h23" }).format(new Date(now)));
+  return hour >= 13 || hour < 3 ? "from" : "to";
+}
+
+/**
+ * A few lines of text for a home-screen widget that shows text from a URL (e.g. KWGT's web get). Uses clock times
+ * rather than countdowns, since these widgets only refresh every few minutes.
+ */
+export function summaryText(board: Board, journey: "to" | "from", now: number): string {
+  const b = board.barrier;
+  const barrier = `Barrier ${b.down ? "DOWN" : b.closingSoon ? "CLOSING" : "open"}`
+    + (b.changesAt && !b.closingSoon ? `${b.down ? ", opens" : " until"} ~${formatClock(b.changesAt)}` : "")
+    + (b.source === "live" ? " (live)" : "");
+  const lines: string[] = [];
+  if (journey === "to") {
+    const trains = board.trains.filter((t) => t.catchable).slice(0, 3);
+    lines.push("Barnes → Waterloo");
+    if (!trains.length) lines.push("No trains you can make");
+    trains.forEach((t, i) => {
+      const exp = t.delayMinutes > 0 ? ` (exp ${formatClock(t.expected)})` : "";
+      const plat = t.platform ? ` P${t.platform}` : "";
+      lines.push(i === 0
+        ? `Leave ${formatClock(t.plan!.leaveAt)} for the ${formatClock(t.scheduled)}${exp}${plat}`
+        : `${formatClock(t.scheduled)}${exp} – leave ${formatClock(t.plan!.leaveAt)}`);
+    });
+  } else {
+    const trains = (board.back ?? []).filter((t) => !t.cancelled && t.expected >= now - 30_000).slice(0, 3);
+    lines.push("Waterloo → Barnes");
+    if (!trains.length) lines.push("No trains to Barnes soon");
+    for (const t of trains) {
+      const exp = t.delayMinutes > 0 ? ` (exp ${formatClock(t.expected)})` : "";
+      const plat = t.platform ? ` P${t.platform}` : "";
+      const arrive = t.arriveExpected != null ? ` → Barnes ${formatClock(t.arriveExpected)}` : "";
+      lines.push(`${formatClock(t.scheduled)}${exp}${plat}${arrive}`);
+    }
+  }
+  lines.push(barrier);
+  lines.push(`Updated ${formatClock(now)}`);
+  return lines.join("\n");
+}

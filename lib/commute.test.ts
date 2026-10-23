@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyLive, barrierStatus, parseReturns, parseUkTime, barrierWindows, buildBoard, configFromEnv, crossingTimes, formatClock, londonTime, parseDepartures, planLeave, walkMinutesFrom, type CommuteConfig, type RttService } from "./commute.ts";
+import { applyLive, autoJourney, barrierStatus, summaryText, parseReturns, parseUkTime, barrierWindows, buildBoard, configFromEnv, crossingTimes, formatClock, londonTime, parseDepartures, planLeave, walkMinutesFrom, type CommuteConfig, type RttService } from "./commute.ts";
 
 const DAY = "2026-10-23"; // BST (UTC+1)
 const at = (hhmm: string) => londonTime(DAY, hhmm);
@@ -175,4 +175,22 @@ test("loop trains use their first call at Barnes, and trains beaten to Barnes by
   const [alone] = parseReturns([loop], atBarnes, { walkMinutes: 12 }, now);
   assert.equal(alone.arriveExpected, at("1226"));
   assert.equal(alone.destination, "loop back to Waterloo");
+});
+
+test("plain-text summary for Android widgets, and which way it shows by time of day", () => {
+  assert.equal(autoJourney(at("0800")), "to");
+  assert.equal(autoJourney(at("1300")), "from");
+  assert.equal(autoJourney(at("0100")), "from");
+  const now = at("0800");
+  const deps = parseDepartures([svc("A", { dep: { s: "0816", f: "0818" }, platform: "3" }), svc("B", { dep: { s: "0831" } })], now);
+  const back = parseReturns([svc("R", { dep: { s: "0830" }, platform: "22" })], [svc("R", { arr: { s: "0848" } })], cfg, now);
+  const board = buildBoard(deps, [], cfg, now, back);
+  assert.equal(summaryText(board, "to", now), [
+    "Barnes → Waterloo",
+    "Leave 08:07 for the 08:16 (exp 08:18) P3",
+    "08:31 – leave 08:20",
+    "Barrier open",
+    "Updated 08:00",
+  ].join("\n"));
+  assert.equal(summaryText(board, "from", now).split("\n")[1], "08:30 P22 → Barnes 08:48");
 });

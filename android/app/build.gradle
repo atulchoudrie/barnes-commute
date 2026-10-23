@@ -1,0 +1,36 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "uk.barnes.commute"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "uk.barnes.commute"
+        minSdk 26
+        targetSdk 35
+        versionCode (System.getenv("GITHUB_RUN_NUMBER") ?: "1").toInteger()
+        versionName "1.0.${System.getenv("GITHUB_RUN_NUMBER") ?: "0"}"
+    }
+
+    // One fixed key, so each new build installs over the last one.
+    signingConfigs {
+        widget {
+            storeFile file("widget.keystore")
+            storePassword "barnes-trains"
+            keyAlias "widget"
+            keyPassword "barnes-trains"
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.widget
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
