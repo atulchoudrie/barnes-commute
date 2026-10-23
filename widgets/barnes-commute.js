@@ -1,7 +1,8 @@
 // Barnes ⇄ Waterloo home-screen widget for iPhone / iPad, using the free Scriptable app (scriptable.app).
 //
 // Setup:
-//   1. Install Scriptable, tap +, paste this whole file, name it "Barnes trains".
+//   1. Install Scriptable. On the phone, open https://barnes-commute.vercel.app/api/widget?key=… (this script, ready to
+//      copy), select all and copy; in Scriptable tap +, paste, and name it "Barnes trains".
 //   2. Long-press the home screen → + → Scriptable → pick Small, Medium or Large → tap the widget while
 //      jiggling → Script: "Barnes trains". Tapping the widget opens the full board.
 //

@@ -13,8 +13,9 @@ Everything here runs on free plans: Vercel (this app), Render (the live barrier 
 
 1. Sign in at the [Realtime Trains API portal](https://api-portal.rtt.io) (with a free Realtime Trains account) and request a token. The free plan allows 100 requests an hour; the app caches lookups to stay well inside that.
 2. Import this repo into Vercel (Framework: Next.js) and add the variables from `.env.example`: at least `RTT_TOKEN` and your home location (`COMMUTE_HOME_LAT` / `COMMUTE_HOME_LON` – right-click your house in Google Maps to copy them) or `COMMUTE_WALK_MINUTES`.
-3. **iPhone widget**: install [Scriptable](https://scriptable.app), paste in `widgets/barnes-commute.js` (`BOARD_URL` at the top points at this app), then add a Scriptable widget (small, medium or large) to the home screen and pick the script. The widget shows the journey to Waterloo before 1pm and the way home after; set a widget's Parameter to `to` or `from` to fix it to one direction. Countdowns keep ticking between iOS refreshes. `/api/board?journey=to|from` fetches only one direction, which keeps a widget refreshing all day inside the free Realtime Trains limits.
-4. **Live barrier** (optional): deploy `worker/barrier` – see [its README](worker/barrier/README.md) – and set `BARRIER_LIVE_URL` / `BARRIER_LIVE_KEY`.
+3. **iPhone widget**: install [Scriptable](https://scriptable.app), open `/api/widget?key=…` on the phone (the script from `widgets/barnes-commute.js`, set up for this app), copy it into a new script, then add a Scriptable widget (small, medium or large) to the home screen and pick the script. The widget shows the journey to Waterloo before 1pm and the way home after; set a widget's Parameter to `to` or `from` to fix it to one direction. Countdowns keep ticking between iOS refreshes. `/api/board?journey=to|from` fetches only one direction, which keeps a widget refreshing all day inside the free Realtime Trains limits.
+4. **Android**: open `/?key=…` in Chrome → ⋮ → *Add to Home screen* → *Install*. It opens full screen like an app (there's no free Scriptable equivalent for a live widget).
+5. **Live barrier** (optional): deploy `worker/barrier` – see [its README](worker/barrier/README.md) – and set `BARRIER_LIVE_URL` / `BARRIER_LIVE_KEY`.
 
 ## How it works
 

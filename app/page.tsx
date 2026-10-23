@@ -5,11 +5,17 @@ import AutoRefresh from "./AutoRefresh";
 
 // Phone page for Barnes → Waterloo. Add it to the home screen (Share → Add to Home Screen); it refreshes itself.
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = {
-  title: "Barnes → Waterloo",
-  robots: { index: false, follow: false },
-  appleWebApp: { capable: true, title: "Trains", statusBarStyle: "default" },
-};
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ key?: string }> }): Promise<Metadata> {
+  const { key = "" } = await searchParams;
+  return {
+    title: "Barnes → Waterloo",
+    robots: { index: false, follow: false },
+    appleWebApp: { capable: true, title: "Trains", statusBarStyle: "default" },
+    icons: { apple: "/api/icon/180", icon: "/api/icon/192" },
+    // Android's "Add to Home screen" reads this; it carries the key so the icon opens the board.
+    manifest: `/api/manifest?key=${encodeURIComponent(key)}`,
+  };
+}
 export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#f5f5f7" };
 
 function leaveText(t: BoardTrain): string {
