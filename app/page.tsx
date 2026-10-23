@@ -34,7 +34,10 @@ function TrainRow({ t, first }: { t: BoardTrain; first: boolean }) {
             : t.delayMinutes > 0 ? <span className="ml-2 text-sm font-medium text-amber-600">exp {formatClock(t.expected)}</span>
             : <span className="ml-2 text-sm font-medium text-emerald-600">On time</span>}
         </div>
-        <div className="text-xs text-slate-500">{t.bus ? "Bus · " : ""}{t.platform ? `Platform ${t.platform}` : "Platform –"}</div>
+        <div className="text-xs text-slate-500">
+          {t.bus ? "Bus · " : ""}{t.platform ? `Platform ${t.platform}` : "Platform –"}
+          {t.arriveExpected != null && !t.cancelled ? ` · Waterloo ${formatClock(t.arriveExpected)}` : ""}
+        </div>
       </div>
       {t.plan && (
         <div className="text-right">

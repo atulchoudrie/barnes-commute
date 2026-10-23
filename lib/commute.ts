@@ -156,6 +156,9 @@ export interface Departure {
   cancelled: boolean;
   cancelReason: string | null;
   bus: boolean;
+  /** Arrival at the end of the journey (Waterloo, or Barnes on the way home), when looked up. */
+  arriveScheduled?: number | null;
+  arriveExpected?: number | null;
 }
 
 /** Waterloo-bound departures from Barnes, soonest first. */
@@ -293,30 +296,44 @@ export interface ReturnTrain extends Departure {
   homeAt: number | null;
 }
 
-/**
- * Barnes-bound trains from Waterloo (departure board), joined to their arrival at Barnes (arrivals from Waterloo).
- * Loop services that run round and back to Waterloo can call at Barnes twice, so the first call is used; and a train
- * that a later one beats to Barnes (e.g. a loop going the long way round) isn't worth catching, so it's left out.
- */
-export function parseReturns(fromWaterloo: RttService[], atBarnes: RttService[], cfg: Pick<CommuteConfig, "walkMinutes">, now: number): ReturnTrain[] {
+/** Each train's first arrival at a station, from that station's arrivals list (loop trains can call twice). */
+function firstArrivals(atStation: RttService[]): Map<string, RttTimes | undefined> {
   const arrivals = new Map<string, RttTimes | undefined>();
-  for (const s of atBarnes) {
+  for (const s of atStation) {
     const uid = s.scheduleMetadata.uniqueIdentity, a = s.temporalData.arrival, seen = arrivals.get(uid);
     if (!arrivals.has(uid) || (booked(a) ?? Infinity) < (booked(seen) ?? Infinity)) arrivals.set(uid, a);
   }
-  const trains = parseDepartures(fromWaterloo, now).map((d) => {
+  return arrivals;
+}
+
+/** Adds each departure's arrival time at the other end, from that station's arrivals. */
+export function withArrivals<T extends Departure>(departures: T[], atDestination: RttService[]): T[] {
+  const arrivals = firstArrivals(atDestination);
+  return departures.map((d) => {
     const a = arrivals.get(d.uid);
-    const arriveScheduled = booked(a), arriveExpected = best(a);
-    return {
-      ...d,
-      destination: d.destination === WATERLOO.name ? "loop back to Waterloo" : d.destination,
-      arriveScheduled,
-      arriveExpected,
-      homeAt: arriveExpected == null ? null : arriveExpected + cfg.walkMinutes * MIN,
-    };
+    return { ...d, arriveScheduled: booked(a), arriveExpected: best(a) };
   });
+}
+
+/**
+ * Leaves out trains that a later one gets you there no later than. That drops loop services going the long way
+ * round – they also "call at" the far end, an hour later – and a loop train listed at both of its calls.
+ */
+export function dropOvertaken<T extends Departure>(trains: T[]): T[] {
   return trains.filter((t) => t.arriveExpected == null || !trains.some((o) =>
-    o !== t && !o.cancelled && o.expected > t.expected && o.arriveExpected != null && o.arriveExpected < t.arriveExpected!));
+    o !== t && !o.cancelled && o.expected > t.expected && o.arriveExpected != null && o.arriveExpected <= t.arriveExpected!));
+}
+
+/** Barnes-bound trains from Waterloo (departure board), with their arrival at Barnes and a home-by time. */
+export function parseReturns(fromWaterloo: RttService[], atBarnes: RttService[], cfg: Pick<CommuteConfig, "walkMinutes">, now: number): ReturnTrain[] {
+  const trains = withArrivals(parseDepartures(fromWaterloo, now), atBarnes).map((d) => ({
+    ...d,
+    destination: d.destination === WATERLOO.name ? "loop back to Waterloo" : d.destination,
+    arriveScheduled: d.arriveScheduled ?? null,
+    arriveExpected: d.arriveExpected ?? null,
+    homeAt: d.arriveExpected == null ? null : d.arriveExpected + cfg.walkMinutes * MIN,
+  }));
+  return dropOvertaken(trains);
 }
 
 // ---------- The board ----------

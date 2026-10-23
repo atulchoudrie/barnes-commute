@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { applyLive, autoJourney, barrierPhrase, barrierStatus, summaryText, parseReturns, parseUkTime, barrierWindows, buildBoard, configFromEnv, crossingTimes, formatClock, londonTime, parseDepartures, planLeave, walkMinutesFrom, type CommuteConfig, type RttService } from "./commute.ts";
+import { applyLive, autoJourney, barrierPhrase, barrierStatus, dropOvertaken, withArrivals, summaryText, parseReturns, parseUkTime, barrierWindows, buildBoard, configFromEnv, crossingTimes, formatClock, londonTime, parseDepartures, planLeave, walkMinutesFrom, type CommuteConfig, type RttService } from "./commute.ts";
 
 const DAY = "2026-10-23"; // BST (UTC+1)
 const at = (hhmm: string) => londonTime(DAY, hhmm);
@@ -217,4 +217,15 @@ test("destination: skips one cut from today's journey, and names both halves of 
   const [a, b] = parseDepartures([short, split], now);
   assert.equal(a.destination, "Addlestone");
   assert.equal(b.destination, "Windsor & Eton Riverside / Weybridge");
+});
+
+test("to Waterloo: loop trains going the long way round, and a train listed twice, are left out", () => {
+  const now = at("1745");
+  const direct = svc("D", { dep: { s: "1805" }, platform: "3" });
+  const loopOut = svc("L", { dep: { s: "1805" }, platform: "1" }); // heading away from London, back at Waterloo 19:02
+  const loopBack = svc("L", { dep: { s: "1850" }, platform: "3" }); // the same train on its way back
+  const atWaterloo = [svc("D", { arr: { s: "1822" } }), svc("L", { arr: { s: "1902" } })];
+  const trains = dropOvertaken(withArrivals(parseDepartures([direct, loopOut, loopBack], now), atWaterloo));
+  assert.deepEqual(trains.map((t) => [t.uid, formatClock(t.scheduled), t.platform]), [["D", "18:05", "3"], ["L", "18:50", "3"]]);
+  assert.equal(trains[0].arriveExpected, at("1822"));
 });
