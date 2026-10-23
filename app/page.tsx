@@ -114,6 +114,8 @@ function ReturnRow({ t, first }: { t: ReturnTrain; first: boolean }) {
   );
 }
 
+const SHOW = 3; // trains listed each way
+
 export default async function CommutePage({ searchParams }: { searchParams: Promise<{ key?: string }> }) {
   const { key } = await searchParams;
   if (!commuteKeyOk(key)) return <main className="p-6 text-sm text-slate-500">Add ?key=… to the link.</main>;
@@ -125,6 +127,8 @@ export default async function CommutePage({ searchParams }: { searchParams: Prom
     return <main className="p-6 text-sm text-red-700"><AutoRefresh seconds={30} />Couldn&apos;t load trains: {(e as Error).message}</main>;
   }
   const { next, config: c } = board;
+  // Just the next few you can still make (a cancelled one stays in so you know about it).
+  const upcoming = board.trains.filter((t) => t.catchable || t.cancelled).slice(0, SHOW);
 
   return (
     <main className="mx-auto max-w-md space-y-4 bg-slate-50 p-4 pb-10">
@@ -148,14 +152,14 @@ export default async function CommutePage({ searchParams }: { searchParams: Prom
       <BarrierCard b={board.barrier} now={board.generatedAt} />
 
       <section className="rounded-2xl bg-white px-4 py-1 shadow-card">
-        <ul>{board.trains.slice(0, 8).map((t, i) => <TrainRow key={t.uid + t.scheduled} t={t} first={i === 0} />)}</ul>
-        {board.trains.length === 0 && <p className="py-4 text-sm text-slate-500">No departures in the next hour or so.</p>}
+        <ul>{upcoming.map((t, i) => <TrainRow key={t.uid + t.scheduled} t={t} first={i === 0} />)}</ul>
+        {upcoming.length === 0 && <p className="py-4 text-sm text-slate-500">No departures in the next hour or so.</p>}
       </section>
 
       <section>
         <h2 className="mb-2 px-1 text-sm font-semibold text-slate-500">Back from Waterloo</h2>
         <div className="rounded-2xl bg-white px-4 py-1 shadow-card">
-          <ul>{(board.back ?? []).slice(0, 6).map((t, i) => <ReturnRow key={t.uid + t.scheduled} t={t} first={i === 0} />)}</ul>
+          <ul>{(board.back ?? []).slice(0, SHOW).map((t, i) => <ReturnRow key={t.uid + t.scheduled} t={t} first={i === 0} />)}</ul>
           {!board.back?.length && <p className="py-4 text-sm text-slate-500">No trains to Barnes in the next two hours.</p>}
         </div>
       </section>

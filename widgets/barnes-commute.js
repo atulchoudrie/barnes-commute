@@ -123,7 +123,7 @@ function build(board, family) {
 
   if (family !== "small") {
     w.addSpacer(6);
-    const later = cur.trains.slice(1, family === "large" ? 7 : 3);
+    const later = cur.trains.slice(1, 3); // next 3 trains in all
     for (const t of later) {
       const row = w.addStack();
       text(row, clock(t.scheduled), 13, C.text, "semibold");
@@ -190,7 +190,7 @@ function buildBack(board, family) {
 
   if (family !== "small") {
     w.addSpacer(6);
-    for (const t of trains.slice(1, family === "large" ? 8 : 3)) {
+    for (const t of trains.slice(1, 3)) { // next 3 trains in all
       const row = w.addStack();
       text(row, clock(t.scheduled), 13, C.text, "semibold");
       if (t.delayMinutes > 0) text(row, ` exp ${clock(t.expected)}`, 13, C.amber);
