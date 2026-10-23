@@ -68,7 +68,8 @@ public class TrainsWidget extends AppWidgetProvider {
                 prefs.edit().putString("last", text).apply();
             } catch (Exception e) {
                 String last = prefs.getString("last", null);
-                text = last != null ? last + "\n(offline)" : "Barnes trains\nCan't reach the board\n\nTap to retry\n";
+                String why = e.getClass().getSimpleName() + (e.getMessage() != null ? ": " + e.getMessage() : "");
+                text = last != null ? last + "\n(offline)" : "Barnes trains\nCan't reach the board\n" + why + "\n\nTap to retry\n";
             }
             draw(app, text);
             pending.finish();
@@ -80,12 +81,16 @@ public class TrainsWidget extends AppWidgetProvider {
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setConnectTimeout(10_000);
         conn.setReadTimeout(15_000);
-        try (InputStream in = conn.getInputStream()) {
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            byte[] buf = new byte[4096];
-            for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
-            if (conn.getResponseCode() != 200) throw new Exception("HTTP " + conn.getResponseCode());
-            return out.toString(StandardCharsets.UTF_8.name());
+        conn.setRequestProperty("User-Agent", "BarnesTrainsWidget");
+        try {
+            int code = conn.getResponseCode();
+            if (code != 200) throw new Exception("HTTP " + code);
+            try (InputStream in = conn.getInputStream()) {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                byte[] buf = new byte[4096];
+                for (int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
+                return out.toString(StandardCharsets.UTF_8.name());
+            }
         } finally {
             conn.disconnect();
         }
