@@ -59,8 +59,8 @@ export function configFromEnv(env: Record<string, string | undefined>): CommuteC
     walkMinutes,
     walkSource,
     platformBufferMinutes: num(env.COMMUTE_PLATFORM_BUFFER_MINUTES) ?? 1,
-    barrierCloseBeforeMinutes: num(env.COMMUTE_BARRIER_CLOSE_BEFORE_MINUTES) ?? 3,
-    barrierOpenAfterMinutes: num(env.COMMUTE_BARRIER_OPEN_AFTER_MINUTES) ?? 1,
+    barrierCloseBeforeMinutes: num(env.COMMUTE_BARRIER_CLOSE_BEFORE_MINUTES) ?? 2,
+    barrierOpenAfterMinutes: num(env.COMMUTE_BARRIER_OPEN_AFTER_MINUTES) ?? 0.5,
     walkToCrossingMinutes: num(env.COMMUTE_WALK_TO_CROSSING_MINUTES),
   };
 }
