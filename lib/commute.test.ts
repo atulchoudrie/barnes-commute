@@ -128,7 +128,7 @@ test("board picks the first train you can still make", () => {
   assert.equal(b.journeyMinutes, 11);
 });
 
-test("live barrier state overrides the forecast while the feed is fresh", () => {
+test("live barrier state, combined with the forecast, while the feed is fresh", () => {
   const now = at("0800");
   const deps = parseDepartures([svc("next", { dep: { s: "0830" } })], now);
   const forecast = buildBoard(deps, [{ id: "A:d", time: at("0803"), estimated: false }, { id: "B:d", time: at("0820"), estimated: false }], cfg, now).barrier;
@@ -136,10 +136,15 @@ test("live barrier state overrides the forecast while the feed is fresh", () => 
   assert.equal(forecast.down, true); // 08:00–08:04 forecast
 
   const live = { feed: { state: "connected" }, lastMessageAt: now - 30_000, down: false, closingSoon: false, trains: [] };
-  const open = applyLive(forecast, live, now);
-  assert.equal(open.source, "live");
-  assert.equal(open.down, false); // the train is late: live says open
-  assert.ok(open.windows.every((w) => w.closes > now)); // the forecast closure covering now isn't shown
+  // Forecast says a train is crossing now: down, even though live hasn't seen it (it can miss trains).
+  const due = applyLive(forecast, live, now);
+  assert.equal(due.source, "live");
+  assert.equal(due.down, true);
+  assert.equal(due.changesAt, at("0804"));
+  // Between forecast closures, live decides.
+  const later = { ...live, lastMessageAt: at("0810") - 30_000 };
+  const open = applyLive(forecast, later, at("0810"));
+  assert.equal(open.down, false);
   assert.equal(open.changesAt, at("0817")); // next forecast closure
 
   const down = applyLive(forecast, { ...live, down: true, trains: [{ descr: "2K15", direction: "towards Richmond", role: "protect" }] }, now);
@@ -147,7 +152,7 @@ test("live barrier state overrides the forecast while the feed is fresh", () => 
   assert.equal(down.changesAt, at("0804"));
   assert.equal(down.liveTrains[0].descr, "2K15");
 
-  const closing = applyLive(forecast, { ...live, closingSoon: true }, now);
+  const closing = applyLive(forecast, { ...later, closingSoon: true }, at("0810"));
   assert.deepEqual([closing.down, closing.closingSoon, closing.changesAt], [false, true, null]);
 
   assert.equal(applyLive(forecast, { ...live, lastMessageAt: now - 10 * 60_000 }, now).source, "timetable"); // stale

@@ -93,7 +93,7 @@ function BarrierCard({ b, now, commuteKey }: { b: Board["barrier"]; now: number;
       )}
       {b.source === "live" && <ReportBarrier commuteKey={commuteKey} />}
       <p className="mt-3 text-xs text-slate-400">
-        {b.source === "live" ? "Now: live, from where trains are on the signalling system. Later closures: forecast from train times."
+        {b.source === "live" ? "Now: live from the signalling system, plus any train the timetable has crossing now. Later closures: forecast from train times."
           : "Estimated from train times; the live feed isn't available right now."}
       </p>
     </section>

@@ -410,15 +410,15 @@ export function applyLive(b: BoardBarrier, live: LiveBarrier | null, now: number
   if (!live || live.feed?.state !== "connected" || live.lastMessageAt == null || now - live.lastMessageAt > LIVE_STALE_MS) return b;
   const current = b.windows.find((w) => w.closes <= now && now < w.opens);
   const later = b.windows.find((w) => w.closes > now);
+  // Down if the live feed says so, or if the forecast has a train crossing now: seen at the crossing, the live
+  // tracker can miss a train (e.g. 00:15–00:17 down, live said open), so "open" from it doesn't override the forecast.
+  const down = live.down || !!current;
   return {
     ...b,
     source: "live",
-    down: live.down,
-    closingSoon: !live.down && live.closingSoon,
-    changesAt: live.down ? current?.opens ?? null : live.closingSoon ? null : later?.closes ?? null,
-    // The live state decides "now": if it says up, a forecast closure covering this moment (a late or
-    // cancelled train) isn't shown, so the page doesn't say both "open" and "down now".
-    windows: live.down ? b.windows : b.windows.filter((w) => w !== current),
+    down,
+    closingSoon: !down && live.closingSoon,
+    changesAt: down ? current?.opens ?? null : live.closingSoon ? null : later?.closes ?? null,
     liveTrains: live.trains,
   };
 }
