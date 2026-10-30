@@ -416,6 +416,9 @@ export function applyLive(b: BoardBarrier, live: LiveBarrier | null, now: number
     down: live.down,
     closingSoon: !live.down && live.closingSoon,
     changesAt: live.down ? current?.opens ?? null : live.closingSoon ? null : later?.closes ?? null,
+    // The live state decides "now": if it says up, a forecast closure covering this moment (a late or
+    // cancelled train) isn't shown, so the page doesn't say both "open" and "down now".
+    windows: live.down ? b.windows : b.windows.filter((w) => w !== current),
     liveTrains: live.trains,
   };
 }

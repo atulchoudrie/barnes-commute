@@ -139,6 +139,7 @@ test("live barrier state overrides the forecast while the feed is fresh", () => 
   const open = applyLive(forecast, live, now);
   assert.equal(open.source, "live");
   assert.equal(open.down, false); // the train is late: live says open
+  assert.ok(open.windows.every((w) => w.closes > now)); // the forecast closure covering now isn't shown
   assert.equal(open.changesAt, at("0817")); // next forecast closure
 
   const down = applyLive(forecast, { ...live, down: true, trains: [{ descr: "2K15", direction: "towards Richmond", role: "protect" }] }, now);
